@@ -1,0 +1,725 @@
+"use client";
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import {
+  Target,
+  Plus,
+  TrendingUp,
+  Trash2,
+  Calendar,
+  Wallet,
+  ArrowUpRight,
+  Heart,
+  Plane,
+  Car,
+  Home,
+  Laptop,
+  Briefcase,
+  Gift,
+  AlertTriangle,
+  ShieldCheck,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { EmptyState } from "../empty-state";
+import { useState } from "react";
+import {
+  addSavingContribution,
+  deleteSavingGoal,
+  addSavingGoal,
+  updateSavingGoal,
+} from "@/lib/actions";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical, Pencil } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+const ICON_MAP: Record<string, any> = {
+  Target,
+  Heart,
+  Plane,
+  Car,
+  Home,
+  Laptop,
+  Briefcase,
+  Gift,
+  TrendingUp,
+  ShieldCheck,
+};
+
+interface SavingsGoal {
+  id: number;
+  name: string;
+  targetAmount: number;
+  currentAmount: number | null;
+  iconName: string | null;
+  color: string | null;
+  dueDate: string | null;
+}
+
+interface SavingsTabContentProps {
+  initialGoals?: SavingsGoal[];
+}
+
+export function SavingsTabContent({
+  initialGoals = [],
+}: SavingsTabContentProps) {
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isContributeOpen, setIsContributeOpen] = useState(false);
+  const [selectedGoal, setSelectedGoal] = useState<SavingsGoal | null>(null);
+  const [contributionAmount, setContributionAmount] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Form State for New/Edit Goal
+  const [newName, setNewName] = useState("");
+  const [newTarget, setNewTarget] = useState("");
+  const [newIcon, setNewIcon] = useState("Target");
+
+  const handleAddGoal = async () => {
+    if (!newName || !newTarget) return;
+    setLoading(true);
+    try {
+      await addSavingGoal({
+        name: newName,
+        targetAmount: parseInt(newTarget.replace(/\./g, "")),
+        iconName: newIcon,
+        color: "#10b981",
+      });
+      toast.success("Target tabungan berhasil dibuat!", {
+        description: "Mari mulai menabung untuk impianmu.",
+      });
+      setIsAddOpen(false);
+      resetForm();
+    } catch (error) {
+      toast.error("Gagal membuat target");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditGoal = async () => {
+    if (!selectedGoal || !newName || !newTarget) return;
+    setLoading(true);
+    try {
+      await updateSavingGoal(selectedGoal.id, {
+        name: newName,
+        targetAmount: parseInt(newTarget.replace(/\./g, "")),
+        iconName: newIcon,
+      });
+      toast.success("Target berhasil diperbarui!");
+      setIsEditOpen(false);
+      resetForm();
+    } catch (error) {
+      toast.error("Gagal memperbarui target");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setNewName("");
+    setNewTarget("");
+    setNewIcon("Target");
+    setSelectedGoal(null);
+  };
+
+  const formatCurrencyInput = (value: string) => {
+    const number = value.replace(/\D/g, "");
+    return number ? parseInt(number).toLocaleString("id-ID") : "";
+  };
+
+  const handleContribute = async () => {
+    if (!selectedGoal || !contributionAmount) return;
+    setLoading(true);
+    try {
+      const rawAmount = parseInt(contributionAmount.replace(/\./g, ""));
+      await addSavingContribution(selectedGoal.id, rawAmount);
+      toast.success(
+        `Berhasil menabung Rp ${rawAmount.toLocaleString("id-ID")}`,
+        {
+          description: `Progres untuk ${selectedGoal.name} telah diperbarui.`,
+        },
+      );
+      setIsContributeOpen(false);
+      setContributionAmount("");
+    } catch (error) {
+      toast.error("Gagal menambahkan tabungan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedGoal) return;
+    setLoading(true);
+    try {
+      await deleteSavingGoal(selectedGoal.id);
+      toast.success("Target dihapus");
+      setIsDeleteOpen(false);
+      resetForm();
+    } catch (error) {
+      toast.error("Gagal menghapus target");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalTarget = initialGoals.reduce(
+    (acc, g) => acc + (g.targetAmount || 0),
+    0,
+  );
+  const totalSaved = initialGoals.reduce(
+    (acc, g) => acc + (g.currentAmount || 0),
+    0,
+  );
+  const overallProgress =
+    totalTarget > 0 ? (totalSaved / totalTarget) * 100 : 0;
+
+  return (
+    <div className="space-y-8">
+      {/* Overview Stats */}
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="border-emerald-500/20 bg-emerald-500/5 backdrop-blur-md md:col-span-2 overflow-hidden relative group">
+          <div className="absolute -right-20 -top-20 size-64 bg-emerald-500/10 rounded-full blur-3xl animate-pulse" />
+          <CardHeader className="relative z-10">
+            <CardTitle className="text-sm font-black uppercase tracking-widest text-emerald-500 flex items-center gap-2">
+              <TrendingUp className="size-4" />
+              Total Progres Tabungan
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="relative z-10 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div>
+                <p className="text-4xl font-black font-mono">
+                  Rp {totalSaved.toLocaleString("id-ID")}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 font-medium">
+                  Terkumpul dari target total Rp{" "}
+                  {totalTarget.toLocaleString("id-ID")}
+                </p>
+              </div>
+              <Badge 
+                className={cn(
+                  "font-black px-4 py-2 rounded-xl shadow-lg transition-all",
+                  overallProgress >= 100
+                    ? "bg-emerald-500 text-white shadow-emerald-500/30 ring-2 ring-emerald-400/30"
+                    : "bg-primary/20 text-primary border border-primary/30"
+                )}
+              >
+                {overallProgress >= 100
+                  ? `${overallProgress.toFixed(1)}% Terlampaui 🎉`
+                  : `${overallProgress.toFixed(1)}% Tercapai`}
+              </Badge>
+            </div>
+            <div className="space-y-2">
+              <Progress
+                value={Math.min(overallProgress, 100)}
+                className="h-3 bg-emerald-500/10"
+                indicatorClassName={cn(
+                  overallProgress >= 100
+                    ? "bg-emerald-500 shadow-[0_0_12px_2px_rgba(16,185,129,0.4)]"
+                    : "bg-primary"
+                )}
+              />
+              <div className="flex justify-between text-[10px] font-bold text-muted-foreground/60 px-0.5">
+                <span>Rp 0</span>
+                <span>Target: Rp {totalTarget.toLocaleString("id-ID")}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-primary/20 bg-primary/5 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center space-y-4">
+          <div className="size-16 rounded-3xl bg-primary/20 flex items-center justify-center text-primary shadow-xl shadow-primary/10">
+            <Target className="size-8" />
+          </div>
+          <div>
+            <p className="font-black text-lg">Mulai Impian Baru</p>
+            <p className="text-xs text-muted-foreground max-w-[180px] mt-1 font-medium">
+              Tetapkan target dan disiplin menabung setiap hari.
+            </p>
+          </div>
+          <Sheet open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <SheetTrigger asChild>
+              <Button className="w-full rounded-2xl bg-primary hover:bg-primary/90 font-black shadow-lg shadow-primary/20">
+                <Plus className="size-4 mr-2" />
+                Tambah Target
+              </Button>
+            </SheetTrigger>
+            <SheetContent 
+              side="right"
+              className="w-full sm:max-w-lg bg-background/40 backdrop-blur-3xl border-l border-white/10 shadow-2xl overflow-hidden p-0 gap-0 focus:outline-none flex flex-col"
+            >
+              <SheetHeader className="px-6 pt-8 pb-6 border-b border-white/5 shrink-0">
+                <SheetTitle className="text-2xl font-black">
+                  Buat Target Baru
+                </SheetTitle>
+                <SheetDescription className="font-medium text-muted-foreground">
+                  Apa impian besar yang ingin Anda wujudkan selanjutnya?
+                </SheetDescription>
+              </SheetHeader>
+              <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
+                    Nama Impian
+                  </Label>
+                  <Input
+                    placeholder="Contoh: Dana Darurat, Liburan Jepang"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="rounded-xl bg-muted/10 border-white/10 h-12 font-bold focus-visible:ring-primary/30"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
+                    Target Nominal (Rp)
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/40 font-black text-sm">Rp</span>
+                    <Input
+                      placeholder="10.000.000"
+                      value={newTarget}
+                      onChange={(e) =>
+                        setNewTarget(formatCurrencyInput(e.target.value))
+                      }
+                      className="rounded-xl bg-muted/10 border-white/10 h-12 font-mono font-black text-base pl-10 focus-visible:ring-primary/30"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
+                    Pilih Ikon
+                  </Label>
+                  <div className="grid grid-cols-5 gap-3">
+                    {Object.keys(ICON_MAP).map((icon) => {
+                      const IconComp = ICON_MAP[icon];
+                      const isActive = newIcon === icon;
+                      return (
+                        <button
+                          key={icon}
+                          type="button"
+                          className={cn(
+                            "size-14 rounded-2xl flex items-center justify-center transition-all duration-200 border",
+                            isActive
+                              ? "bg-primary/20 border-primary text-primary shadow-lg shadow-primary/30 scale-110 ring-2 ring-primary/30 ring-offset-1 ring-offset-background"
+                              : "bg-muted/10 border-white/5 text-muted-foreground/60 hover:border-white/20 hover:text-white hover:bg-muted/20",
+                          )}
+                          onClick={() => setNewIcon(icon)}
+                        >
+                          <IconComp className="size-6" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <SheetFooter className="px-6 py-4 border-t border-white/5 shrink-0">
+                <Button
+                  onClick={handleAddGoal}
+                  disabled={loading || !newName || !newTarget}
+                  className="w-full rounded-2xl h-14 bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/20 disabled:opacity-40"
+                >
+                  {loading ? "Memproses..." : "Pasang Target! 🎯"}
+                </Button>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        </Card>
+      </div>
+
+      {/* Goals Grid */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {initialGoals.length > 0 ? (
+          initialGoals.map((goal) => {
+            const current = goal.currentAmount || 0;
+            const progress = (current / goal.targetAmount) * 100;
+            const Icon = ICON_MAP[goal.iconName || "Target"] || Target;
+
+            return (
+              <Card
+                key={goal.id}
+                className="border-border/40 bg-card/30 backdrop-blur-md group hover:border-primary/30 transition-all duration-300 overflow-hidden relative"
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between">
+                    <div
+                      className={cn(
+                        "p-4 rounded-2xl bg-emerald-500/10 text-emerald-500 mb-4",
+                      )}
+                    >
+                      <Icon className="size-6" />
+                    </div>
+                    <div className="flex gap-1">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 rounded-lg text-muted-foreground/50 hover:text-white hover:bg-white/10 transition-colors"
+                          >
+                            <MoreVertical className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40 bg-background/80 backdrop-blur-2xl border-white/10 rounded-xl p-1.5 shadow-2xl">
+                          <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 px-2 py-1.5">
+                            Opsi Target
+                          </DropdownMenuLabel>
+                          <DropdownMenuSeparator className="bg-white/5" />
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setSelectedGoal(goal);
+                              setNewName(goal.name);
+                              setNewTarget(goal.targetAmount.toString());
+                              setNewIcon(goal.iconName || "Target");
+                              setIsEditOpen(true);
+                            }}
+                            className="rounded-lg text-xs font-bold py-2 gap-2 focus:bg-primary/10 focus:text-primary transition-colors cursor-pointer"
+                          >
+                            <Pencil className="size-3.5" />
+                            Ubah
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setSelectedGoal(goal);
+                              setIsDeleteOpen(true);
+                            }}
+                            className="rounded-lg text-xs font-bold py-2 gap-2 focus:bg-rose-500/10 focus:text-rose-500 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="size-3.5" />
+                            Hapus
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                  <CardTitle className="text-xl font-black group-hover:text-primary transition-colors">
+                    {goal.name}
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-2 mt-1 font-medium text-xs">
+                    <Calendar className="size-3" />
+                    Target: {goal.dueDate || "Tanpa batas waktu"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6 pt-4">
+                  <div className="flex justify-between items-end">
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">
+                        Terkumpul
+                      </p>
+                      <p className="text-xl font-black font-mono">
+                        Rp {current.toLocaleString("id-ID")}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      {current >= goal.targetAmount ? (
+                        <>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500/70">
+                            Terlampaui
+                          </p>
+                          <p className="text-sm font-bold text-emerald-500 italic">
+                            +Rp {(current - goal.targetAmount).toLocaleString("id-ID")}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">
+                            Sisa
+                          </p>
+                          <p className="text-sm font-bold text-rose-500/80 italic">
+                            Rp {(goal.targetAmount - current).toLocaleString("id-ID")} lagi
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                      <span className={progress >= 100 ? "text-emerald-500" : "text-primary"}>
+                        {Math.min(progress, 999).toFixed(0)}% {progress >= 100 ? "Selesai 🎉" : "Tercapai"}
+                      </span>
+                      <span className="text-muted-foreground opacity-40">
+                        Target: Rp {goal.targetAmount.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                    <Progress
+                      value={Math.min(progress, 100)}
+                      className="h-2 bg-muted/20"
+                      indicatorClassName={cn(
+                        progress >= 100
+                          ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]"
+                          : "bg-primary shadow-[0_0_10px_rgba(139,92,246,0.3)]"
+                      )}
+                    />
+                  </div>
+
+                  <Button
+                    onClick={() => {
+                      setSelectedGoal(goal);
+                      setIsContributeOpen(true);
+                    }}
+                    className="w-full rounded-2xl bg-white/5 hover:bg-emerald-500 hover:text-white border border-white/5 font-black uppercase tracking-widest text-[10px] h-12 transition-all active:scale-95"
+                  >
+                    <Wallet className="size-4 mr-2" />
+                    Tambah Tabungan
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })
+        ) : (
+          <div className="col-span-full py-20 border-2 border-dashed border-border/40 rounded-[32px] flex flex-col items-center">
+            <EmptyState 
+              icon={Target}
+              title="Belum Ada Target"
+              description="Wujudkan impianmu dengan mulai menetapkan target tabungan hari ini."
+            />
+            <Button
+              onClick={() => setIsAddOpen(true)}
+              variant="outline"
+              className="rounded-xl border-primary/30 text-primary font-bold mt-2"
+            >
+              Buat Target Pertama
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <SheetContent 
+          side="right"
+          className="w-full sm:max-w-lg bg-background/40 backdrop-blur-3xl border-l border-white/10 shadow-2xl overflow-hidden p-0 gap-0 focus:outline-none flex flex-col"
+        >
+          <SheetHeader className="px-6 pt-8 pb-6 border-b border-white/5 shrink-0">
+            <SheetTitle className="text-2xl font-black">
+              Edit Target
+            </SheetTitle>
+            <SheetDescription className="font-medium text-muted-foreground">
+              Sesuaikan target impian Anda.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
+                Nama Impian
+              </Label>
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="rounded-xl bg-muted/10 border-white/10 h-12 font-bold focus-visible:ring-primary/30"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
+                Target Nominal (Rp)
+              </Label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/40 font-black text-sm">Rp</span>
+                <Input
+                  value={newTarget}
+                  onChange={(e) =>
+                    setNewTarget(formatCurrencyInput(e.target.value))
+                  }
+                  className="rounded-xl bg-muted/10 border-white/10 h-12 font-mono font-black text-base pl-10 focus-visible:ring-primary/30"
+                />
+              </div>
+            </div>
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
+                Ubah Ikon
+              </Label>
+              <div className="grid grid-cols-5 gap-3">
+                {Object.keys(ICON_MAP).map((icon) => {
+                  const IconComp = ICON_MAP[icon];
+                  const isActive = newIcon === icon;
+                  return (
+                    <button
+                      key={icon}
+                      type="button"
+                      className={cn(
+                        "size-14 rounded-2xl flex items-center justify-center transition-all duration-200 border",
+                        isActive
+                          ? "bg-primary/20 border-primary text-primary shadow-lg shadow-primary/30 scale-110 ring-2 ring-primary/30 ring-offset-1 ring-offset-background"
+                          : "bg-muted/10 border-white/5 text-muted-foreground/60 hover:border-white/20 hover:text-white hover:bg-muted/20",
+                      )}
+                      onClick={() => setNewIcon(icon)}
+                    >
+                      <IconComp className="size-6" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <SheetFooter className="px-6 py-4 border-t border-white/5 shrink-0">
+            <Button
+              onClick={handleEditGoal}
+              disabled={loading || !newName || !newTarget}
+              className="w-full rounded-2xl h-14 bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/20 disabled:opacity-40"
+            >
+              {loading ? "Menyimpan..." : "Simpan Perubahan"}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* Premium Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent className="bg-background/40 backdrop-blur-3xl border-white/10 rounded-[32px] overflow-hidden shadow-2xl p-0 sm:max-w-[400px]">
+          <div className="absolute top-0 inset-x-0 h-24 bg-linear-to-b from-rose-500/10 to-transparent pointer-events-none" />
+          <div className="p-8 pt-10 flex flex-col items-center text-center space-y-4">
+            <div className="size-16 rounded-3xl bg-rose-500/20 flex items-center justify-center text-rose-500 mb-2">
+              <AlertTriangle className="size-8" />
+            </div>
+            <div className="space-y-2">
+              <AlertDialogTitle className="text-2xl font-black tracking-tight">
+                Hapus Target?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground font-medium">
+                Tindakan ini akan menghapus target impian Anda. Riwayat tabungan
+                untuk target ini tetap akan tercatat di transaksi.
+              </AlertDialogDescription>
+            </div>
+          </div>
+          <AlertDialogFooter className="p-8 pt-0 flex flex-row gap-3">
+            <AlertDialogCancel className="flex-1 rounded-2xl h-12 font-black uppercase tracking-widest text-[10px] border border-white/5 hover:bg-white/5 bg-transparent m-0">
+              Batal
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={loading}
+              className="flex-1 rounded-2xl h-12 bg-rose-500 hover:bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-rose-500/20 m-0"
+            >
+              {loading ? "Menghapus..." : "Ya, Hapus"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Contribution Sheet */}
+      <Sheet open={isContributeOpen} onOpenChange={setIsContributeOpen}>
+        <SheetContent 
+          side="right"
+          className="w-full sm:max-w-lg bg-background/40 backdrop-blur-3xl border-l border-white/10 shadow-2xl overflow-hidden p-0 gap-0 focus:outline-none flex flex-col"
+        >
+          <SheetHeader className="px-6 pt-8 pb-6 border-b border-white/5 shrink-0">
+            <SheetTitle className="text-2xl font-black">
+              Nabung buat {selectedGoal?.name}
+            </SheetTitle>
+            <SheetDescription className="font-medium text-muted-foreground">
+              Berapa banyak yang ingin Anda sisihkan hari ini?
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            {/* Progress preview if goal exists */}
+            {selectedGoal && (
+              <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 space-y-2">
+                <div className="flex justify-between text-xs font-bold text-muted-foreground">
+                  <span>Progres saat ini</span>
+                  <span className="text-emerald-500">
+                    Rp {(selectedGoal.currentAmount || 0).toLocaleString("id-ID")} / Rp {selectedGoal.targetAmount.toLocaleString("id-ID")}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-emerald-500/10 overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(((selectedGoal.currentAmount || 0) / selectedGoal.targetAmount) * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
+                Nominal Tabungan (Rp)
+              </Label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-muted-foreground/40 text-sm">
+                  Rp
+                </span>
+                <Input
+                  placeholder="0"
+                  autoFocus
+                  value={contributionAmount}
+                  onChange={(e) =>
+                    setContributionAmount(formatCurrencyInput(e.target.value))
+                  }
+                  className="rounded-xl bg-muted/10 border-white/10 h-16 pl-12 text-2xl font-mono font-black focus-visible:ring-emerald-500/30"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">Jumlah Cepat</p>
+              <div className="grid grid-cols-3 gap-3">
+                {[50000, 100000, 500000].map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() =>
+                      setContributionAmount(amount.toLocaleString("id-ID"))
+                    }
+                    className={cn(
+                      "h-12 rounded-xl border font-bold text-sm transition-all duration-200",
+                      contributionAmount === amount.toLocaleString("id-ID")
+                        ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
+                        : "bg-muted/10 border-white/5 text-muted-foreground hover:border-white/20 hover:text-white"
+                    )}
+                  >
+                    +{(amount / 1000).toLocaleString("id-ID")}k
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <SheetFooter className="px-6 py-4 border-t border-white/5 shrink-0">
+            <Button
+              onClick={handleContribute}
+              disabled={loading || !contributionAmount}
+              className="w-full rounded-2xl h-14 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg shadow-xl shadow-emerald-500/20 disabled:opacity-40 transition-all"
+            >
+              {loading ? "Memproses..." : "Konfirmasi Tabungan"}
+              <ArrowUpRight className="ml-2 size-5" />
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
