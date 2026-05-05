@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,28 @@ export function OnboardingModal({ user }: { user: any }) {
 
   const [displayBalance, setDisplayBalance] = useState("0");
 
+  // Load draft
+  useEffect(() => {
+    const saved = sessionStorage.getItem("sakuku_onboarding_draft");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setFormData(parsed.formData);
+        setStep(parsed.step);
+        setDisplayBalance(parsed.displayBalance);
+      } catch (e) {}
+    }
+  }, []);
+
+  // Save draft
+  useEffect(() => {
+    sessionStorage.setItem("sakuku_onboarding_draft", JSON.stringify({
+      formData,
+      step,
+      displayBalance
+    }));
+  }, [formData, step, displayBalance]);
+
   const formatNumber = (num: string) => {
     const value = num.replace(/\D/g, "");
     return value.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -60,6 +82,7 @@ export function OnboardingModal({ user }: { user: any }) {
     const result = await completeOnboarding(formData);
     if (result.success) {
       toast.success("Pengaturan awal selesai! Selamat menikmati SakuKu.");
+      sessionStorage.removeItem("sakuku_onboarding_draft");
       setIsOpen(false);
     } else {
       toast.error("Gagal menyimpan pengaturan. Silakan coba lagi.");

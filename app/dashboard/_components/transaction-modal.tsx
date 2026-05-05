@@ -65,11 +65,21 @@ import {
   ICON_MAP,
   AVAILABLE_ICONS,
 } from "@/lib/constants";
+import { Transaction, Category, TransactionModalProps } from "@/types";
 
 // Helper to get the correct icon component based on database value or keyword matching
-const getCategoryIcon = (cat: any) => {
-  // 1. Smart fallback based on keywords in the name (HIGHEST PRIORITY)
-  // This ensures categories like "Bonus" get the Zap icon even if the DB says "Wallet"
+const getCategoryIcon = (cat: Category | any) => {
+  // 1. HIGHEST PRIORITY: Use the icon explicitly stored in database if available
+  if (typeof cat.icon === "string" && ICON_MAP[cat.icon]) {
+    return ICON_MAP[cat.icon];
+  }
+
+  // 2. Fallback: Try using the icon if it's already a component
+  if (cat.icon && typeof cat.icon !== "string") {
+    return cat.icon;
+  }
+
+  // 3. Fallback: Smart keyword matching based on the name (LOWER PRIORITY)
   const name = (cat.name || "").trim().toLowerCase();
 
   // Income keywords
@@ -113,7 +123,6 @@ const getCategoryIcon = (cat: any) => {
   if (
     name.includes("listrik") ||
     name.includes("air") ||
-    name.includes("tagihan") ||
     name.includes("utility") ||
     name.includes("billing")
   )
@@ -130,7 +139,8 @@ const getCategoryIcon = (cat: any) => {
     name.includes("film") ||
     name.includes("bioskop") ||
     name.includes("game") ||
-    name.includes("nonton")
+    name.includes("nonton") ||
+    name.includes("netflix")
   )
     return ICON_MAP["Film"];
   if (
@@ -162,79 +172,53 @@ const getCategoryIcon = (cat: any) => {
   )
     return ICON_MAP["Briefcase"];
   if (
-    name.includes("nonton") ||
-    name.includes("film") ||
-    name.includes("bioskop") ||
-    name.includes("netflix")
-  )
-    return ICON_MAP["Film"];
-  if (
     name.includes("musik") ||
     name.includes("music") ||
     name.includes("spotify")
   )
     return ICON_MAP["Music"];
 
-  // 2. Try mapping from string icon name (from DB) - Lower priority than names
-  if (typeof cat.icon === "string" && ICON_MAP[cat.icon]) {
-    return ICON_MAP[cat.icon];
-  }
-
-  // 3. Try using the icon if it's already a component
-  if (cat.icon && typeof cat.icon !== "string") {
-    return cat.icon;
-  }
-
   // 4. Final default based on type
-  return cat.type === "income" ? ICON_MAP["Wallet"] : ICON_MAP["Plus"];
+  return cat.type === "income" ? ICON_MAP["Wallet"] : ICON_MAP["ShoppingBag"];
 };
 
 // Helper to get the actual color for style or class
 const getCategoryColor = (cat: any, isSelected: boolean) => {
   const defaultColor = cat.type === "income" ? "#10b981" : "#f43f5e";
   const color = cat.color || defaultColor;
-  
+
   if (color.startsWith("#")) {
-    return { 
-      style: { color: isSelected ? color : `${color}90` }, 
-      className: "" 
+    return {
+      style: { color: isSelected ? color : `${color}90` },
+      className: "",
     };
   }
-  
-  return { 
-    style: {}, 
-    className: isSelected ? color : "text-muted-foreground/70" 
+
+  return {
+    style: {},
+    className: isSelected ? color : "text-muted-foreground/70",
   };
 };
 
 const getCategoryBg = (cat: any, isSelected: boolean) => {
   const defaultColor = cat.type === "income" ? "#10b981" : "#f43f5e";
   const color = cat.color || defaultColor;
-  
+
   if (color.startsWith("#")) {
-    return { 
-      style: { 
+    return {
+      style: {
         backgroundColor: isSelected ? `${color}25` : `${color}10`,
-        borderColor: isSelected ? `${color}50` : `${color}20` 
-      } 
+        borderColor: isSelected ? `${color}50` : `${color}20`,
+      },
     };
   }
-  
-  return { 
-    className: isSelected 
-      ? "bg-primary/20 border-primary/40 shadow-primary/10" 
-      : "bg-muted/5 border-transparent hover:border-white/5" 
+
+  return {
+    className: isSelected
+      ? "bg-primary/20 border-primary/40 shadow-primary/10"
+      : "bg-muted/5 border-transparent hover:border-white/5",
   };
 };
-
-interface TransactionModalProps {
-  transaction?: any;
-  categories?: any[];
-  children?: React.ReactNode;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  currency?: string;
-}
 
 export function TransactionModal({
   transaction,
@@ -274,7 +258,7 @@ export function TransactionModal({
   const [newCatPriority, setNewCatPriority] = useState<
     "Kebutuhan" | "Keinginan"
   >("Kebutuhan");
-  const [newCatIcon, setNewCatIcon] = useState("Plus");
+  const [newCatIcon, setNewCatIcon] = useState("ShoppingBag");
 
   const isEdit = !!transaction;
 
@@ -282,7 +266,7 @@ export function TransactionModal({
     if (transaction && open) {
       setType(transaction.type);
       setSelectedCategory(
-        transaction.category?.name || transaction.categoryName || "Makanan",
+        transaction.categoryName || transaction.category || "Makanan",
       );
       setAmount(
         transaction.amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."),
@@ -306,7 +290,7 @@ export function TransactionModal({
           setDescription(parsed.description || "");
           setStore(parsed.store || "");
           setDate(parsed.date || new Date().toLocaleDateString("en-CA"));
-          
+
           toast.info("Draft transaksi dipulihkan", {
             duration: 2000,
           });
@@ -381,7 +365,7 @@ export function TransactionModal({
         date: date,
       };
 
-      if (isEdit) {
+      if (isEdit && transaction) {
         await updateTransaction(transaction.id, data);
         toast.success("Transaksi berhasil diperbarui!", {
           description: "Perubahan telah disimpan ke riwayat Anda.",
@@ -393,7 +377,9 @@ export function TransactionModal({
           description: "Data transaksi baru telah ditambahkan.",
         });
         setAmount("");
+        setStore("");
         setDescription("");
+        setDate(new Date().toLocaleDateString("en-CA"));
       }
       setOpen(false);
     } catch (error) {
@@ -411,26 +397,29 @@ export function TransactionModal({
     setLoading(true);
     try {
       if (editingCategoryId) {
+        // Cari nama lama kategori untuk sinkronisasi state
+        const oldCat = dbCategories.find((c) => c.id === editingCategoryId);
+        const oldName = oldCat?.name;
+
         await updateCategory(editingCategoryId, {
           name: newCatName,
           type: type,
-          priority: type === "expense" ? (newCatPriority as any) : "Lainnya",
+          priority: type === "expense" ? newCatPriority : "Kebutuhan",
           icon: newCatIcon,
         });
+
+        // Jika kategori yang diedit adalah yang sedang dipilih, update state-nya
+        if (selectedCategory === oldName) {
+          setSelectedCategory(newCatName);
+        }
+
         toast.success("Kategori berhasil diperbarui!");
       } else {
         await addCategory({
           name: newCatName,
           type: type,
-          priority: type === "expense" ? (newCatPriority as any) : "Lainnya",
-          color:
-            type === "expense"
-              ? newCatPriority === "Kebutuhan"
-                ? "#f43f5e"
-                : newCatPriority === "Keinginan"
-                  ? "#f59e0b"
-                  : "#10b981"
-              : "#10b981",
+          priority: type === "expense" ? newCatPriority : "Kebutuhan",
+          color: "#ffffff",
           icon: newCatIcon,
         });
         toast.success("Kategori baru berhasil ditambahkan!");
@@ -470,15 +459,15 @@ export function TransactionModal({
     setEditingCategoryId(null);
     setNewCatName("");
     setNewCatPriority("Kebutuhan");
-    setNewCatIcon("Plus");
+    setNewCatIcon("ShoppingBag");
     setIsAddingCategory(true);
   };
 
-  const startEditCategory = (cat: any) => {
+  const startEditCategory = (cat: Category) => {
     setEditingCategoryId(cat.id);
     setNewCatName(cat.name);
     setNewCatPriority(cat.priority === "Kebutuhan" ? "Kebutuhan" : "Keinginan");
-    setNewCatIcon(cat.icon || "Plus");
+    setNewCatIcon(cat.icon || "ShoppingBag");
     setIsAddingCategory(true);
   };
 
@@ -491,7 +480,7 @@ export function TransactionModal({
         <SheetTrigger asChild>{children}</SheetTrigger>
       ) : !controlledOpen && !transaction ? (
         <SheetTrigger asChild>
-          <Button 
+          <Button
             aria-label="Catat transaksi baru"
             className="fixed bottom-8 right-8 size-16 rounded-2xl shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 transition-all hover:scale-110 active:scale-95 group z-50 border border-white/20"
           >
@@ -656,7 +645,11 @@ export function TransactionModal({
                 <div className="flex gap-2">
                   <button
                     onClick={() => setIsManaging(!isManaging)}
-                    aria-label={isManaging ? "Selesai mengelola kategori" : "Kelola kategori"}
+                    aria-label={
+                      isManaging
+                        ? "Selesai mengelola kategori"
+                        : "Kelola kategori"
+                    }
                     className={cn(
                       "text-[9px] font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded-full border transition-all duration-300",
                       isManaging
@@ -676,7 +669,11 @@ export function TransactionModal({
                         startAddCategory();
                       }
                     }}
-                    aria-label={isAddingCategory ? "Batal tambah kategori" : "Tambah kategori baru"}
+                    aria-label={
+                      isAddingCategory
+                        ? "Batal tambah kategori"
+                        : "Tambah kategori baru"
+                    }
                     className={cn(
                       "text-[9px] font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded-full border transition-all duration-300 flex items-center gap-1.5 active:scale-95",
                       isAddingCategory
@@ -805,16 +802,32 @@ export function TransactionModal({
                                   <div
                                     className={cn(
                                       "size-10 rounded-2xl flex items-center justify-center border transition-all duration-300 group-hover:scale-110 group-active:scale-95 shadow-lg",
-                                      getCategoryBg(cat, selectedCategory === cat.name).className
+                                      getCategoryBg(
+                                        cat,
+                                        selectedCategory === cat.name,
+                                      ).className,
                                     )}
-                                    style={getCategoryBg(cat, selectedCategory === cat.name).style}
+                                    style={
+                                      getCategoryBg(
+                                        cat,
+                                        selectedCategory === cat.name,
+                                      ).style
+                                    }
                                   >
                                     <Icon
                                       className={cn(
                                         "size-4 transition-transform group-hover:scale-110",
-                                        getCategoryColor(cat, selectedCategory === cat.name).className
+                                        getCategoryColor(
+                                          cat,
+                                          selectedCategory === cat.name,
+                                        ).className,
                                       )}
-                                      style={getCategoryColor(cat, selectedCategory === cat.name).style}
+                                      style={
+                                        getCategoryColor(
+                                          cat,
+                                          selectedCategory === cat.name,
+                                        ).style
+                                      }
                                     />
                                   </div>
                                   <span
@@ -824,7 +837,12 @@ export function TransactionModal({
                                         ? "opacity-100"
                                         : "text-muted-foreground",
                                     )}
-                                    style={getCategoryColor(cat, selectedCategory === cat.name).style}
+                                    style={
+                                      getCategoryColor(
+                                        cat,
+                                        selectedCategory === cat.name,
+                                      ).style
+                                    }
                                   >
                                     {cat.name}
                                   </span>
@@ -879,16 +897,32 @@ export function TransactionModal({
                                   <div
                                     className={cn(
                                       "size-10 rounded-2xl flex items-center justify-center border transition-all duration-300 group-hover:scale-110 group-active:scale-95 shadow-lg",
-                                      getCategoryBg(cat, selectedCategory === cat.name).className
+                                      getCategoryBg(
+                                        cat,
+                                        selectedCategory === cat.name,
+                                      ).className,
                                     )}
-                                    style={getCategoryBg(cat, selectedCategory === cat.name).style}
+                                    style={
+                                      getCategoryBg(
+                                        cat,
+                                        selectedCategory === cat.name,
+                                      ).style
+                                    }
                                   >
                                     <Icon
                                       className={cn(
                                         "size-4 transition-transform group-hover:scale-110",
-                                        getCategoryColor(cat, selectedCategory === cat.name).className
+                                        getCategoryColor(
+                                          cat,
+                                          selectedCategory === cat.name,
+                                        ).className,
                                       )}
-                                      style={getCategoryColor(cat, selectedCategory === cat.name).style}
+                                      style={
+                                        getCategoryColor(
+                                          cat,
+                                          selectedCategory === cat.name,
+                                        ).style
+                                      }
                                     />
                                   </div>
                                   <span
@@ -898,7 +932,12 @@ export function TransactionModal({
                                         ? "opacity-100"
                                         : "text-muted-foreground",
                                     )}
-                                    style={getCategoryColor(cat, selectedCategory === cat.name).style}
+                                    style={
+                                      getCategoryColor(
+                                        cat,
+                                        selectedCategory === cat.name,
+                                      ).style
+                                    }
                                   >
                                     {cat.name}
                                   </span>
@@ -933,7 +972,6 @@ export function TransactionModal({
                       .filter((c) => c.type === "income")
                       .map((cat) => {
                         const Icon = getCategoryIcon(cat);
-                        const bg = cat.bg || "bg-emerald-500/10";
                         return (
                           <div
                             key={cat.id || cat.name}
@@ -944,19 +982,35 @@ export function TransactionModal({
                               onClick={() => setSelectedCategory(cat.name)}
                               className="flex flex-col items-center gap-2 group transition-all w-full"
                             >
-                                <div
-                                  className={cn(
-                                    "size-10 rounded-2xl flex items-center justify-center border transition-all duration-300 group-hover:scale-110 group-active:scale-95 shadow-lg",
-                                    getCategoryBg(cat, selectedCategory === cat.name).className
-                                  )}
-                                  style={getCategoryBg(cat, selectedCategory === cat.name).style}
-                                >
+                              <div
+                                className={cn(
+                                  "size-10 rounded-2xl flex items-center justify-center border transition-all duration-300 group-hover:scale-110 group-active:scale-95 shadow-lg",
+                                  getCategoryBg(
+                                    cat,
+                                    selectedCategory === cat.name,
+                                  ).className,
+                                )}
+                                style={
+                                  getCategoryBg(
+                                    cat,
+                                    selectedCategory === cat.name,
+                                  ).style
+                                }
+                              >
                                 <Icon
                                   className={cn(
                                     "size-4 transition-transform group-hover:scale-110",
-                                    getCategoryColor(cat, selectedCategory === cat.name).className
+                                    getCategoryColor(
+                                      cat,
+                                      selectedCategory === cat.name,
+                                    ).className,
                                   )}
-                                  style={getCategoryColor(cat, selectedCategory === cat.name).style}
+                                  style={
+                                    getCategoryColor(
+                                      cat,
+                                      selectedCategory === cat.name,
+                                    ).style
+                                  }
                                 />
                               </div>
                               <span
@@ -966,7 +1020,12 @@ export function TransactionModal({
                                     ? "opacity-100"
                                     : "text-muted-foreground",
                                 )}
-                                style={getCategoryColor(cat, selectedCategory === cat.name).style}
+                                style={
+                                  getCategoryColor(
+                                    cat,
+                                    selectedCategory === cat.name,
+                                  ).style
+                                }
                               >
                                 {cat.name}
                               </span>

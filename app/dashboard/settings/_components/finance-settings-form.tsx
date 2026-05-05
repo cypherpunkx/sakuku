@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Coins, CalendarDays, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -41,6 +41,24 @@ export function FinanceSettingsForm({ user }: FinanceSettingsFormProps) {
     budgetStartDay: user?.budgetStartDay || 1,
   });
 
+  // Load draft
+  useEffect(() => {
+    const saved = sessionStorage.getItem("sakuku_finance_draft");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setFormData((p) => ({ ...p, ...parsed }));
+      } catch (e) {}
+    }
+  }, []);
+
+  // Save draft
+  useEffect(() => {
+    if (formData.currency !== (user?.currency || "IDR") || formData.budgetStartDay !== (user?.budgetStartDay || 1)) {
+      sessionStorage.setItem("sakuku_finance_draft", JSON.stringify(formData));
+    }
+  }, [formData, user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -52,6 +70,7 @@ export function FinanceSettingsForm({ user }: FinanceSettingsFormProps) {
           description:
             "Perubahan akan diterapkan pada laporan dan anggaran Anda.",
         });
+        sessionStorage.removeItem("sakuku_finance_draft");
       } else {
         toast.error("Gagal memperbarui pengaturan", {
           description: result.error,

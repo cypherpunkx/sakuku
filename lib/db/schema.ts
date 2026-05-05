@@ -25,8 +25,7 @@ export const categories = sqliteTable("categories", {
   color: text("color"),
   icon: text("icon"),
   priority: text("priority")
-    .$type<"Kebutuhan" | "Keinginan" | "Tabungan" | "Lainnya">()
-    .default("Lainnya"),
+    .$type<"Kebutuhan" | "Keinginan">(),
 });
 
 export const transactions = sqliteTable("transactions", {
@@ -37,7 +36,7 @@ export const transactions = sqliteTable("transactions", {
   description: text("description"),
   store: text("store"),
   date: text("date").notNull(), // ISO format or YYYY-MM-DD
-  userId: text("user_id").references(() => users.id),
+  userId: text("user_id").references(() => users.id, { onUpdate: "cascade" }),
   billId: integer("bill_id").references(() => bills.id),
   goalId: integer("goal_id").references(() => savingsGoals.id),
 });
@@ -76,7 +75,7 @@ export const budgets = sqliteTable("budgets", {
   categoryId: integer("category_id").references(() => categories.id),
   amountLimit: integer("amount_limit").notNull(),
   period: text("period").notNull(), // e.g., "2024-05"
-  userId: text("user_id").references(() => users.id),
+  userId: text("user_id").references(() => users.id, { onUpdate: "cascade" }),
 });
 
 export const budgetsRelations = relations(budgets, ({ one }) => ({
@@ -99,7 +98,7 @@ export const bills = sqliteTable("bills", {
   isPaid: integer("is_paid", { mode: "boolean" }).default(false),
   urgent: integer("urgent", { mode: "boolean" }).default(false),
   iconName: text("icon_name"),
-  userId: text("user_id").references(() => users.id),
+  userId: text("user_id").references(() => users.id, { onUpdate: "cascade" }),
 });
 
 export const billsRelations = relations(bills, ({ one }) => ({
@@ -117,7 +116,7 @@ export const savingsGoals = sqliteTable("savings_goals", {
   iconName: text("icon_name").default("Target"),
   color: text("color").default("#10b981"),
   dueDate: text("due_date"),
-  userId: text("user_id").references(() => users.id),
+  userId: text("user_id").references(() => users.id, { onUpdate: "cascade" }),
 });
 
 export const savingsGoalsRelations = relations(savingsGoals, ({ one }) => ({
@@ -142,7 +141,7 @@ export const userLearningProgress = sqliteTable("user_learning_progress", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: text("user_id")
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onUpdate: "cascade" }),
   articleId: integer("article_id").notNull(),
   completedAt: text("completed_at").notNull(),
 });
@@ -151,7 +150,7 @@ export const userBookmarks = sqliteTable("user_bookmarks", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: text("user_id")
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onUpdate: "cascade" }),
   articleId: integer("article_id").notNull(),
   createdAt: text("created_at").notNull(),
 });

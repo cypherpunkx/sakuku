@@ -30,6 +30,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import Image from "next/image";
 
 interface LearningTabContentProps {
   initialArticles?: any[];
@@ -126,10 +127,11 @@ export function LearningTabContent({
               <div className="relative z-10 flex flex-col md:flex-row gap-8 p-8 md:p-10">
                 <div className="w-full md:w-48 h-48 rounded-[24px] overflow-hidden bg-primary/20 shrink-0 relative shadow-2xl shadow-primary/20">
                   {recommended.imageUrl ? (
-                    <img
+                    <Image
                       src={recommended.imageUrl}
                       alt={recommended.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-110"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-primary/30 to-indigo-500/30">
@@ -248,13 +250,11 @@ export function LearningTabContent({
                   {/* Card Header Media */}
                   {article.isExternal && article.imageUrl ? (
                     <div className="relative w-full h-32 overflow-hidden border-b border-border/40">
-                      <img
+                      <Image
                         src={article.imageUrl}
                         alt={article.title}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        onError={(e) =>
-                          (e.currentTarget.style.display = "none")
-                        }
+                        fill
+                        className="object-cover transition-transform duration-700 group-hover:scale-110"
                       />
                       <div className="absolute inset-0 bg-linear-to-t from-background/80 to-transparent" />
                     </div>
@@ -472,10 +472,11 @@ export function LearningTabContent({
                 <>
                   {currentArticle.imageUrl && (
                     <div className="w-full h-72 overflow-hidden relative">
-                      <img
+                      <Image
                         src={currentArticle.imageUrl}
                         alt={currentArticle.title}
-                        className="w-full h-full object-cover"
+                        fill
+                        className="object-cover"
                       />
                       <div className="absolute inset-0 bg-linear-to-t from-[#0a0a0b] via-[#0a0a0b]/20 to-transparent" />
                     </div>

@@ -16,7 +16,7 @@ export const categorySchema = z.object({
   type: z.enum(["income", "expense"]),
   color: z.string().optional(),
   icon: z.string().optional(),
-  priority: z.enum(["Kebutuhan", "Keinginan", "Tabungan", "Lainnya"]).optional(),
+  priority: z.enum(["Kebutuhan", "Keinginan"]).optional(),
 });
 
 // Budget Schema
@@ -54,7 +54,7 @@ export const billSchema = z.object({
 export const userProfileSchema = z.object({
   name: z.string().min(1).optional(),
   email: z.string().email().optional(),
-  image: z.string().url().optional(),
+  image: z.string().url().optional().or(z.literal("")),
 });
 
 // Finance Settings Schema

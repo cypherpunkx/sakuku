@@ -67,7 +67,7 @@ export async function addSavingContribution(id: number, amount: number) {
         name: "Tabungan",
         type: "expense",
         icon: "TrendingUp",
-        priority: "Tabungan",
+        priority: "Kebutuhan",
         color: "#10b981",
       })
       .returning();

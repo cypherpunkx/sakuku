@@ -18,9 +18,7 @@ export async function updateUserProfile(data: any) {
   try {
     await db
       .update(schema.users)
-      .set({
-        ...data,
-      })
+      .set(validatedData)
       .where(eq(schema.users.id, await getUserId()));
 
     revalidatePath("/dashboard");
@@ -38,9 +36,7 @@ export async function updateFinanceSettings(data: any) {
   try {
     await db
       .update(schema.users)
-      .set({
-        ...data,
-      })
+      .set(validatedData)
       .where(eq(schema.users.id, await getUserId()));
 
     revalidatePath("/dashboard");
@@ -59,9 +55,7 @@ export async function updateSecuritySettings(data: any) {
   try {
     await db
       .update(schema.users)
-      .set({
-        ...data,
-      })
+      .set(validatedData)
       .where(eq(schema.users.id, await getUserId()));
 
     revalidatePath("/dashboard/settings");
@@ -78,9 +72,7 @@ export async function updateNotificationSettings(data: any) {
   try {
     await db
       .update(schema.users)
-      .set({
-        ...data,
-      })
+      .set(validatedData)
       .where(eq(schema.users.id, await getUserId()));
 
     revalidatePath("/dashboard/settings");

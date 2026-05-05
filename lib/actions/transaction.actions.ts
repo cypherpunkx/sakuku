@@ -23,7 +23,7 @@ export async function addTransaction(data: any) {
         name: formData.categoryName,
         type: formData.type,
         color: formData.type === "expense" ? "#ef4444" : "#10b981",
-        priority: "Lainnya",
+        priority: "Kebutuhan",
       })
       .returning();
     category = result[0];
@@ -85,7 +85,7 @@ export async function updateTransaction(id: number, data: any) {
         name: formData.categoryName,
         type: formData.type,
         color: formData.type === "expense" ? "#ef4444" : "#10b981",
-        priority: "Lainnya",
+        priority: "Kebutuhan",
       })
       .returning();
     category = result[0];
@@ -195,7 +195,7 @@ export async function addCategory(formData: {
   type: "income" | "expense";
   color?: string;
   icon?: string;
-  priority?: "Kebutuhan" | "Keinginan" | "Tabungan" | "Lainnya";
+  priority?: "Kebutuhan" | "Keinginan";
 }) {
   await db.insert(schema.categories).values({
     ...formData,
@@ -226,7 +226,7 @@ export async function updateCategory(
     type: "income" | "expense";
     color?: string;
     icon?: string;
-    priority?: "Kebutuhan" | "Keinginan" | "Tabungan" | "Lainnya";
+    priority?: "Kebutuhan" | "Keinginan";
   },
 ) {
   await db

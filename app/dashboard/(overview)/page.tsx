@@ -81,9 +81,11 @@ import {
   CardGridTabSkeleton,
   HealthTabSkeleton,
 } from "../_components/dashboard-skeletons";
+import { OnboardingModal } from "../_components/onboarding-modal";
 
 export const metadata: Metadata = {
-  title: "Ringkasan",
+  title: "Ringkasan Dashboard | SakuKu",
+  description: "Pantau kesehatan finansial dan ringkasan anggaran Anda secara real-time.",
 };
 
 // --- Wrapper Components for Streaming ---
