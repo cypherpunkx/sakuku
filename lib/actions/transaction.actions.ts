@@ -9,13 +9,11 @@ const CURRENT_USER_ID = "user_1";
 
 import { getUser } from "./dashboard.actions";
 
-export async function addTransaction(formData: {
-  amount: number;
-  categoryName: string;
-  type: "income" | "expense";
-  description?: string;
-  date?: string;
-}) {
+import { transactionSchema } from "../validations";
+
+export async function addTransaction(data: any) {
+  const validatedData = transactionSchema.parse(data);
+  const formData = validatedData;
   let category = await db.query.categories.findFirst({
     where: eq(schema.categories.name, formData.categoryName),
   });
@@ -35,6 +33,7 @@ export async function addTransaction(formData: {
     categoryId: category.id,
     type: formData.type,
     description: formData.description || formData.categoryName,
+    store: formData.store,
     date: formData.date || new Date().toLocaleDateString("en-CA"),
     userId: CURRENT_USER_ID,
   });
@@ -51,16 +50,9 @@ export async function addTransaction(formData: {
   revalidatePath("/dashboard", "layout");
 }
 
-export async function updateTransaction(
-  id: number,
-  formData: {
-    amount: number;
-    categoryName: string;
-    type: "income" | "expense";
-    description?: string;
-    date?: string;
-  }
-) {
+export async function updateTransaction(id: number, data: any) {
+  const validatedData = transactionSchema.parse(data);
+  const formData = validatedData;
   const oldTx = await db.query.transactions.findFirst({
     where: eq(schema.transactions.id, id),
   });
@@ -85,6 +77,7 @@ export async function updateTransaction(
     categoryId: category.id,
     type: formData.type,
     description: formData.description || formData.categoryName,
+    store: formData.store,
     date: formData.date || oldTx.date,
   }).where(eq(schema.transactions.id, id));
 
@@ -163,7 +156,7 @@ export async function addCategory(formData: {
   type: "income" | "expense";
   color?: string;
   icon?: string;
-  priority?: "Penting" | "Sekunder" | "Lainnya";
+  priority?: "Kebutuhan" | "Keinginan" | "Tabungan" | "Lainnya";
 }) {
   await db.insert(schema.categories).values({
     ...formData,
@@ -194,7 +187,7 @@ export async function updateCategory(
     type: "income" | "expense";
     color?: string;
     icon?: string;
-    priority?: "Penting" | "Sekunder" | "Lainnya";
+    priority?: "Kebutuhan" | "Keinginan" | "Tabungan" | "Lainnya";
   }
 ) {
   await db.update(schema.categories).set({

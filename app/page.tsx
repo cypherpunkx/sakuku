@@ -1,5 +1,11 @@
 import { ThemeShowcase } from "@/components/theme-showcase";
 import { Button } from "@/components/ui/button";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "SakuKu - Aplikasi Manajemen Keuangan Pribadi Cerdas",
+  description: "Kelola pengeluaran, buat anggaran, dan pantau kesehatan finansial Anda dengan dashboard modern yang intuitif dan estetis.",
+};
 
 export default function Home() {
   return (

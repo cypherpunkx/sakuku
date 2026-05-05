@@ -28,7 +28,7 @@ import {
   AlertTriangle,
   Inbox,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { useState } from "react";
 import { payBill, deleteBill } from "@/lib/actions";
@@ -55,10 +55,14 @@ const ICON_MAP = {
 };
 
 interface BillTabContentProps {
-  initialBills?: any[];
+  initialBills: any[];
+  currency?: string;
 }
 
-export function BillTabContent({ initialBills = [] }: BillTabContentProps) {
+export function BillTabContent({
+  initialBills,
+  currency = "IDR",
+}: BillTabContentProps) {
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [billToDelete, setBillToDelete] = useState<any | null>(null);
@@ -150,7 +154,7 @@ export function BillTabContent({ initialBills = [] }: BillTabContentProps) {
                   Sisa Tagihan
                 </span>
                 <span className="text-3xl font-mono font-black text-primary">
-                  Rp {snowballTarget.amount.toLocaleString("id-ID")}
+                  {formatCurrency(snowballTarget.amount, currency)}
                 </span>
               </div>
               <Button
@@ -205,10 +209,10 @@ export function BillTabContent({ initialBills = [] }: BillTabContentProps) {
             Total Tagihan {currentMonthName}
           </p>
           <p className="text-4xl font-mono font-black tracking-tighter">
-            Rp{" "}
-            {initialBills
-              .reduce((acc, curr) => acc + curr.amount, 0)
-              .toLocaleString("id-ID")}
+            {formatCurrency(
+              initialBills.reduce((acc, curr) => acc + curr.amount, 0),
+              currency,
+            )}
           </p>
           <div className="mt-4 flex items-center gap-2 text-[10px] font-black text-rose-500 uppercase">
             <TrendingUp className="size-3" />
@@ -286,7 +290,7 @@ export function BillTabContent({ initialBills = [] }: BillTabContentProps) {
                     <div className="flex flex-col items-end gap-3">
                       <div className="text-right">
                         <p className="font-mono font-black text-lg">
-                          Rp {bill.amount.toLocaleString("id-ID")}
+                          {formatCurrency(bill.amount, currency)}
                         </p>
                         {!bill.isPaid && bill.urgent && (
                           <Badge
@@ -389,7 +393,7 @@ export function BillTabContent({ initialBills = [] }: BillTabContentProps) {
                         <span className="font-medium">{item.name}</span>
                       </div>
                       <span className="text-muted-foreground">
-                        Rp {item.amount.toLocaleString("id-ID")}
+                        {formatCurrency(item.amount, currency)}
                       </span>
                     </div>
                   ))

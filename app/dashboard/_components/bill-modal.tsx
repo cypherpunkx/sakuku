@@ -16,6 +16,11 @@ import { Separator } from "@/components/ui/separator";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Switch } from "@/components/ui/switch";
 import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import {
   Zap,
   CreditCard,
   ShieldCheck,
@@ -150,17 +155,27 @@ export function BillModal({ open, onOpenChange }: BillModalProps) {
             <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground/70">
               Jumlah Tagihan
             </Label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-muted-foreground/50">
-                RP
-              </span>
-              <Input
+            <InputGroup className="bg-background/50 border-white/10 rounded-2xl h-14 focus-within:ring-primary/20 overflow-hidden">
+              <InputGroupAddon className="pl-4">
+                <span className={cn(
+                  "font-black text-muted-foreground/50 group-focus-within/input-group:text-primary/40 transition-all duration-300",
+                  formData.amount.length > 12 ? "text-xs" : "text-sm"
+                )}>
+                  RP
+                </span>
+              </InputGroupAddon>
+              <InputGroupInput
                 value={formData.amount}
                 onChange={handleAmountChange}
-                className="bg-background/50 border-white/10 rounded-2xl h-14 pl-12 text-xl font-mono font-black"
+                maxLength={20}
+                className={cn(
+                  "font-mono font-black transition-all duration-300",
+                  formData.amount.length <= 10 ? "text-xl" :
+                  formData.amount.length <= 15 ? "text-lg" : "text-sm"
+                )}
                 placeholder="0"
               />
-            </div>
+            </InputGroup>
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2">

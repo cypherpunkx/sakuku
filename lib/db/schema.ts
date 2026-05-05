@@ -7,6 +7,12 @@ export const users = sqliteTable("users", {
   email: text("email").notNull(),
   image: text("image"),
   balance: integer("balance").default(0),
+  currency: text("currency").default("IDR"),
+  budgetStartDay: integer("budget_start_day").default(1),
+  twoFactorEnabled: integer("two_factor_enabled", { mode: "boolean" }).default(false),
+  emailNotifications: integer("email_notifications", { mode: "boolean" }).default(true),
+  pushNotifications: integer("push_notifications", { mode: "boolean" }).default(true),
+  weeklyReport: integer("weekly_report", { mode: "boolean" }).default(true),
 });
 
 export const categories = sqliteTable("categories", {
@@ -16,7 +22,7 @@ export const categories = sqliteTable("categories", {
   color: text("color"),
   icon: text("icon"),
   priority: text("priority")
-    .$type<"Penting" | "Sekunder" | "Lainnya">()
+    .$type<"Kebutuhan" | "Keinginan" | "Tabungan" | "Lainnya">()
     .default("Lainnya"),
 });
 

@@ -7,7 +7,10 @@ import { revalidatePath } from "next/cache";
 
 const CURRENT_USER_ID = "user_1";
 
+import { budgetSchema } from "../validations";
+
 export async function upsertBudget(categoryId: number, amountLimit: number) {
+  budgetSchema.parse({ categoryId, amount: amountLimit });
   const currentMonth = new Date().toLocaleDateString("en-CA").slice(0, 7); // YYYY-MM
 
   // Check if budget already exists for this category and period

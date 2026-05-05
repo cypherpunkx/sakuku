@@ -1,6 +1,12 @@
 "use client";
 
-import { LayoutDashboard, BarChart3, BookOpen, Settings } from "lucide-react";
+import { 
+  LayoutDashboard, 
+  BarChart3, 
+  BookOpen, 
+  Settings, 
+  LogOut 
+} from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import {
@@ -16,6 +22,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+
+import Link from "next/link";
 
 const navItems = [
   {
@@ -44,6 +52,7 @@ export function AppSidebar({ user }: { user?: any }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentTab = searchParams.get("tab");
+  
   const initials = user?.name
     ? user.name
         .split(" ")
@@ -69,16 +78,17 @@ export function AppSidebar({ user }: { user?: any }) {
           </span>
         </div>
       </SidebarHeader>
+      
       <SidebarContent>
         <SidebarGroup className="group-data-[collapsible=icon]:px-2">
-          <SidebarGroupLabel className="px-4 text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/60 mb-2 group-data-[collapsible=icon]:hidden">
+          <SidebarGroupLabel className="px-4 text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/90 mb-2 group-data-[collapsible=icon]:hidden">
             Main Navigation
           </SidebarGroupLabel>
           <SidebarMenu className="gap-1">
             {navItems.map((item: any) => {
               const isActive = item.url === "/dashboard" 
-                ? pathname === "/dashboard" && !currentTab
-                : pathname === item.url || (item.url !== "/dashboard" && pathname?.startsWith(item.url));
+                ? (pathname === "/dashboard" || pathname === "/dashboard/")
+                : pathname?.startsWith(item.url);
 
               return (
                 <SidebarMenuItem key={item.title}>
@@ -93,7 +103,7 @@ export function AppSidebar({ user }: { user?: any }) {
                         : "hover:bg-primary/5",
                     )}
                   >
-                    <a
+                    <Link
                       href={item.url}
                       className="flex items-center gap-3 py-3 w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
                       aria-label={`Buka halaman ${item.title}`}
@@ -129,10 +139,10 @@ export function AppSidebar({ user }: { user?: any }) {
                           isActive
                             ? "h-1/2 bg-primary shadow-[0_0_12px_rgba(139,92,246,0.5)]"
                             : "h-0 bg-primary/40 group-hover/nav-item:h-1/4",
-                          "group-data-[collapsible=icon]:hidden", // Hide indicator line in icon mode to maintain symmetry
+                          "group-data-[collapsible=icon]:hidden",
                         )}
                       />
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               );
@@ -140,30 +150,43 @@ export function AppSidebar({ user }: { user?: any }) {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4">
+
+      <SidebarFooter className="p-4 space-y-2 group-data-[collapsible=icon]:p-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
+              aria-label="Profil Pengguna dan Pengaturan"
               className="rounded-xl border border-border/40 bg-background/40 backdrop-blur-sm hover:bg-background/60 transition-all"
             >
               <Avatar className="h-9 w-9 rounded-lg border border-primary/20">
-                <AvatarImage
-                  src={user?.image || "https://github.com/shadcn.png"}
-                  alt={user?.name || "User"}
+                <AvatarImage 
+                  src={user?.image || "https://github.com/shadcn.png"} 
+                  alt={user?.name || "User Avatar"} 
                 />
-                <AvatarFallback className="bg-primary/20 text-primary">
-                  {initials}
+                <AvatarFallback className="rounded-lg bg-primary/10 text-primary font-bold">
+                  {user?.name?.[0] || "A"}
                 </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden ml-2">
-                <span className="truncate font-bold text-foreground">
-                  {user?.name || "User"}
+                <span className="truncate font-black text-foreground">
+                  {user?.name || "Admin SakuKu"}
                 </span>
-                <span className="truncate text-[10px] text-muted-foreground/80">
-                  {user?.email || "admin@example.com"}
+                <span className="truncate text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
+                  Premium Member
                 </span>
               </div>
+              <Settings className="ml-auto size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          
+          <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
+            <SidebarMenuButton 
+              aria-label="Keluar dari akun"
+              className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 rounded-xl font-bold py-5 transition-all mt-2"
+            >
+              <LogOut className="size-4 mr-2" />
+              Keluar
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

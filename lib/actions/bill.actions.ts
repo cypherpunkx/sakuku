@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 const CURRENT_USER_ID = "user_1";
 
 import { getUser } from "./dashboard.actions";
+import { billSchema } from "../validations";
 
 export async function payBill(id: number) {
   const bill = await db.query.bills.findFirst({
@@ -34,7 +35,7 @@ export async function payBill(id: number) {
         name: "Tagihan",
         type: "expense",
         icon: "CreditCard",
-        priority: "Penting",
+        priority: "Kebutuhan",
         color: "#f59e0b",
       })
       .returning();
@@ -65,14 +66,9 @@ export async function payBill(id: number) {
   revalidatePath("/dashboard", "layout");
 }
 
-export async function addBill(formData: {
-  name: string;
-  provider: string;
-  amount: number;
-  dueDate: string;
-  urgent?: boolean;
-  iconName?: string;
-}) {
+export async function addBill(data: any) {
+  const validatedData = billSchema.parse(data);
+  const formData = validatedData;
   await db.insert(schema.bills).values({
     ...formData,
     userId: CURRENT_USER_ID,

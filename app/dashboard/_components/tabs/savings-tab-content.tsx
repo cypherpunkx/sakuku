@@ -28,9 +28,9 @@ import {
   AlertTriangle,
   ShieldCheck,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { EmptyState } from "../empty-state";
-import { useState } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import {
   addSavingContribution,
   deleteSavingGoal,
@@ -39,6 +39,11 @@ import {
 } from "@/lib/actions";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,
@@ -89,14 +94,17 @@ interface SavingsGoal {
   iconName: string | null;
   color: string | null;
   dueDate: string | null;
+  currency?: string;
 }
 
 interface SavingsTabContentProps {
-  initialGoals?: SavingsGoal[];
+  initialGoals: any[];
+  currency?: string;
 }
 
 export function SavingsTabContent({
-  initialGoals = [],
+  initialGoals,
+  currency = "IDR",
 }: SavingsTabContentProps) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -104,7 +112,30 @@ export function SavingsTabContent({
   const [isContributeOpen, setIsContributeOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<SavingsGoal | null>(null);
   const [contributionAmount, setContributionAmount] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const [optimisticGoals, addOptimisticAction] = useOptimistic(
+    initialGoals,
+    (
+      state,
+      action: { type: "delete" | "contribute"; id: number; amount?: number },
+    ) => {
+      if (action.type === "delete") {
+        return state.filter((g) => g.id !== action.id);
+      }
+      if (action.type === "contribute") {
+        return state.map((g) =>
+          g.id === action.id
+            ? {
+                ...g,
+                currentAmount: (g.currentAmount || 0) + (action.amount || 0),
+              }
+            : g,
+        );
+      }
+      return state;
+    },
+  );
 
   // Form State for New/Edit Goal
   const [newName, setNewName] = useState("");
@@ -113,43 +144,41 @@ export function SavingsTabContent({
 
   const handleAddGoal = async () => {
     if (!newName || !newTarget) return;
-    setLoading(true);
-    try {
-      await addSavingGoal({
-        name: newName,
-        targetAmount: parseInt(newTarget.replace(/\./g, "")),
-        iconName: newIcon,
-        color: "#10b981",
-      });
-      toast.success("Target tabungan berhasil dibuat!", {
-        description: "Mari mulai menabung untuk impianmu.",
-      });
-      setIsAddOpen(false);
-      resetForm();
-    } catch (error) {
-      toast.error("Gagal membuat target");
-    } finally {
-      setLoading(false);
-    }
+    startTransition(async () => {
+      try {
+        await addSavingGoal({
+          name: newName,
+          targetAmount: parseInt(newTarget.replace(/\./g, "")),
+          iconName: newIcon,
+          color: "#10b981",
+        });
+        toast.success("Target tabungan berhasil dibuat!", {
+          description: "Mari mulai menabung untuk impianmu.",
+        });
+        setIsAddOpen(false);
+        resetForm();
+      } catch (error) {
+        toast.error("Gagal membuat target");
+      }
+    });
   };
 
   const handleEditGoal = async () => {
     if (!selectedGoal || !newName || !newTarget) return;
-    setLoading(true);
-    try {
-      await updateSavingGoal(selectedGoal.id, {
-        name: newName,
-        targetAmount: parseInt(newTarget.replace(/\./g, "")),
-        iconName: newIcon,
-      });
-      toast.success("Target berhasil diperbarui!");
-      setIsEditOpen(false);
-      resetForm();
-    } catch (error) {
-      toast.error("Gagal memperbarui target");
-    } finally {
-      setLoading(false);
-    }
+    startTransition(async () => {
+      try {
+        await updateSavingGoal(selectedGoal.id, {
+          name: newName,
+          targetAmount: parseInt(newTarget.replace(/\./g, "")),
+          iconName: newIcon,
+        });
+        toast.success("Target berhasil diperbarui!");
+        setIsEditOpen(false);
+        resetForm();
+      } catch (error) {
+        toast.error("Gagal memperbarui target");
+      }
+    });
   };
 
   const resetForm = () => {
@@ -166,45 +195,57 @@ export function SavingsTabContent({
 
   const handleContribute = async () => {
     if (!selectedGoal || !contributionAmount) return;
-    setLoading(true);
-    try {
-      const rawAmount = parseInt(contributionAmount.replace(/\./g, ""));
-      await addSavingContribution(selectedGoal.id, rawAmount);
-      toast.success(
-        `Berhasil menabung Rp ${rawAmount.toLocaleString("id-ID")}`,
-        {
-          description: `Progres untuk ${selectedGoal.name} telah diperbarui.`,
-        },
-      );
-      setIsContributeOpen(false);
-      setContributionAmount("");
-    } catch (error) {
-      toast.error("Gagal menambahkan tabungan");
-    } finally {
-      setLoading(false);
-    }
+    const rawAmount = parseInt(contributionAmount.replace(/\./g, ""));
+
+    // 1. Optimistic Update
+    addOptimisticAction({
+      type: "contribute",
+      id: selectedGoal.id,
+      amount: rawAmount,
+    });
+    setIsContributeOpen(false);
+
+    // 2. Real Action
+    startTransition(async () => {
+      try {
+        await addSavingContribution(selectedGoal.id, rawAmount);
+        toast.success(
+          `Berhasil menabung Rp ${rawAmount.toLocaleString("id-ID")}`,
+          {
+            description: `Progres untuk ${selectedGoal.name} telah diperbarui.`,
+          },
+        );
+        setContributionAmount("");
+      } catch (error) {
+        toast.error("Gagal menambahkan tabungan. Mencoba memulihkan...");
+      }
+    });
   };
 
   const handleDelete = async () => {
     if (!selectedGoal) return;
-    setLoading(true);
-    try {
-      await deleteSavingGoal(selectedGoal.id);
-      toast.success("Target dihapus");
-      setIsDeleteOpen(false);
-      resetForm();
-    } catch (error) {
-      toast.error("Gagal menghapus target");
-    } finally {
-      setLoading(false);
-    }
+
+    // 1. Optimistic Update
+    addOptimisticAction({ type: "delete", id: selectedGoal.id });
+    setIsDeleteOpen(false);
+
+    // 2. Real Action
+    startTransition(async () => {
+      try {
+        await deleteSavingGoal(selectedGoal.id);
+        toast.success("Target dihapus");
+        resetForm();
+      } catch (error) {
+        toast.error("Gagal menghapus target. Mencoba memulihkan...");
+      }
+    });
   };
 
-  const totalTarget = initialGoals.reduce(
+  const totalTarget = optimisticGoals.reduce(
     (acc, g) => acc + (g.targetAmount || 0),
     0,
   );
-  const totalSaved = initialGoals.reduce(
+  const totalSaved = optimisticGoals.reduce(
     (acc, g) => acc + (g.currentAmount || 0),
     0,
   );
@@ -224,28 +265,48 @@ export function SavingsTabContent({
             </CardTitle>
           </CardHeader>
           <CardContent className="relative z-10 space-y-6">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-              <div>
-                <p className="text-4xl font-black font-mono">
-                  Rp {totalSaved.toLocaleString("id-ID")}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1 font-medium">
-                  Terkumpul dari target total Rp{" "}
-                  {totalTarget.toLocaleString("id-ID")}
-                </p>
-              </div>
-              <Badge 
-                className={cn(
-                  "font-black px-4 py-2 rounded-xl shadow-lg transition-all",
-                  overallProgress >= 100
-                    ? "bg-emerald-500 text-white shadow-emerald-500/30 ring-2 ring-emerald-400/30"
-                    : "bg-primary/20 text-primary border border-primary/30"
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+              <div className="flex flex-col md:flex-row md:items-center gap-8 md:gap-12 flex-1">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60">Total Terkumpul</p>
+                  <p className="text-4xl font-black font-mono tracking-tighter">
+                    Rp {totalSaved.toLocaleString("id-ID")}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-medium italic">
+                    Dari target Rp {totalTarget.toLocaleString("id-ID")}
+                  </p>
+                </div>
+                
+                {totalTarget > totalSaved && (
+                  <div className="space-y-1 border-l border-white/5 pl-8 hidden md:block">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-rose-500/60">Sisa Target</p>
+                    <p className="text-2xl font-black font-mono text-rose-500/80">
+                      -Rp {(totalTarget - totalSaved).toLocaleString("id-ID")}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground font-medium">
+                      Butuh {Math.ceil((100 - overallProgress) / 10)}% tenaga lagi!
+                    </p>
+                  </div>
                 )}
-              >
-                {overallProgress >= 100
-                  ? `${overallProgress.toFixed(1)}% Terlampaui 🎉`
-                  : `${overallProgress.toFixed(1)}% Tercapai`}
-              </Badge>
+              </div>
+              
+              <div className="flex flex-col items-end gap-2">
+                <Badge
+                  className={cn(
+                    "font-black px-4 py-2 rounded-xl shadow-lg transition-all",
+                    overallProgress >= 100
+                      ? "bg-emerald-500 text-white shadow-emerald-500/30 ring-2 ring-emerald-400/30"
+                      : "bg-primary/20 text-primary border border-primary/30",
+                  )}
+                >
+                  {overallProgress >= 100
+                    ? `${overallProgress.toFixed(1)}% Terlampaui 🎉`
+                    : `${overallProgress.toFixed(1)}% Tercapai`}
+                </Badge>
+                {overallProgress < 100 && (
+                   <span className="text-[9px] font-black text-primary/40 uppercase tracking-tighter">Hampir Separuh!</span>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Progress
@@ -254,12 +315,12 @@ export function SavingsTabContent({
                 indicatorClassName={cn(
                   overallProgress >= 100
                     ? "bg-emerald-500 shadow-[0_0_12px_2px_rgba(16,185,129,0.4)]"
-                    : "bg-primary"
+                    : "bg-primary",
                 )}
               />
               <div className="flex justify-between text-[10px] font-bold text-muted-foreground/60 px-0.5">
-                <span>Rp 0</span>
-                <span>Target: Rp {totalTarget.toLocaleString("id-ID")}</span>
+                <span>{formatCurrency(0, currency)}</span>
+                <span>Target: {formatCurrency(totalTarget, currency)}</span>
               </div>
             </div>
           </CardContent>
@@ -282,11 +343,11 @@ export function SavingsTabContent({
                 Tambah Target
               </Button>
             </SheetTrigger>
-            <SheetContent 
+            <SheetContent
               side="right"
               className="w-full sm:max-w-lg bg-background/40 backdrop-blur-3xl border-l border-white/10 shadow-2xl overflow-hidden p-0 gap-0 focus:outline-none flex flex-col"
             >
-              <SheetHeader className="px-6 pt-8 pb-6 border-b border-white/5 shrink-0">
+              <SheetHeader className="px-8 pt-8 pb-6 border-b border-white/5 shrink-0">
                 <SheetTitle className="text-2xl font-black">
                   Buat Target Baru
                 </SheetTitle>
@@ -294,7 +355,7 @@ export function SavingsTabContent({
                   Apa impian besar yang ingin Anda wujudkan selanjutnya?
                 </SheetDescription>
               </SheetHeader>
-              <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+              <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
                     Nama Impian
@@ -308,19 +369,32 @@ export function SavingsTabContent({
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
-                    Target Nominal (Rp)
+                    Target Nominal ({currency})
                   </Label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/40 font-black text-sm">Rp</span>
-                    <Input
+                  <InputGroup className="bg-muted/10 border-white/10 rounded-xl h-12 focus-within:ring-primary/30 overflow-hidden">
+                    <InputGroupAddon className="pl-4">
+                      <span
+                        className={cn(
+                          "text-muted-foreground/40 font-black transition-all duration-300",
+                          newTarget.length > 12 ? "text-[10px]" : "text-sm",
+                        )}
+                      >
+                        {currency === "USD" ? "$" : "Rp"}
+                      </span>
+                    </InputGroupAddon>
+                    <InputGroupInput
                       placeholder="10.000.000"
                       value={newTarget}
                       onChange={(e) =>
                         setNewTarget(formatCurrencyInput(e.target.value))
                       }
-                      className="rounded-xl bg-muted/10 border-white/10 h-12 font-mono font-black text-base pl-10 focus-visible:ring-primary/30"
+                      maxLength={20}
+                      className={cn(
+                        "font-mono font-black transition-all duration-300",
+                        newTarget.length <= 10 ? "text-base" : "text-xs",
+                      )}
                     />
-                  </div>
+                  </InputGroup>
                 </div>
                 <div className="space-y-3">
                   <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
@@ -349,13 +423,13 @@ export function SavingsTabContent({
                   </div>
                 </div>
               </div>
-              <SheetFooter className="px-6 py-4 border-t border-white/5 shrink-0">
+              <SheetFooter className="px-8 py-4 border-t border-white/5 shrink-0">
                 <Button
                   onClick={handleAddGoal}
-                  disabled={loading || !newName || !newTarget}
+                  disabled={isPending || !newName || !newTarget}
                   className="w-full rounded-2xl h-14 bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/20 disabled:opacity-40"
                 >
-                  {loading ? "Memproses..." : "Pasang Target! 🎯"}
+                  {isPending ? "Memproses..." : "Pasang Target! 🎯"}
                 </Button>
               </SheetFooter>
             </SheetContent>
@@ -365,8 +439,8 @@ export function SavingsTabContent({
 
       {/* Goals Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {initialGoals.length > 0 ? (
-          initialGoals.map((goal) => {
+        {optimisticGoals.length > 0 ? (
+          optimisticGoals.map((goal) => {
             const current = goal.currentAmount || 0;
             const progress = (current / goal.targetAmount) * 100;
             const Icon = ICON_MAP[goal.iconName || "Target"] || Target;
@@ -396,16 +470,23 @@ export function SavingsTabContent({
                             <MoreVertical className="size-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40 bg-background/80 backdrop-blur-2xl border-white/10 rounded-xl p-1.5 shadow-2xl">
+                        <DropdownMenuContent
+                          align="end"
+                          className="w-40 bg-background/80 backdrop-blur-2xl border-white/10 rounded-xl p-1.5 shadow-2xl"
+                        >
                           <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 px-2 py-1.5">
                             Opsi Target
                           </DropdownMenuLabel>
                           <DropdownMenuSeparator className="bg-white/5" />
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={() => {
                               setSelectedGoal(goal);
                               setNewName(goal.name);
-                              setNewTarget(goal.targetAmount.toString());
+                              setNewTarget(
+                                formatCurrencyInput(
+                                  goal.targetAmount.toString(),
+                                ),
+                              );
                               setNewIcon(goal.iconName || "Target");
                               setIsEditOpen(true);
                             }}
@@ -414,7 +495,7 @@ export function SavingsTabContent({
                             <Pencil className="size-3.5" />
                             Ubah
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={() => {
                               setSelectedGoal(goal);
                               setIsDeleteOpen(true);
@@ -453,7 +534,10 @@ export function SavingsTabContent({
                             Terlampaui
                           </p>
                           <p className="text-sm font-bold text-emerald-500 italic">
-                            +Rp {(current - goal.targetAmount).toLocaleString("id-ID")}
+                            +Rp{" "}
+                            {(current - goal.targetAmount).toLocaleString(
+                              "id-ID",
+                            )}
                           </p>
                         </>
                       ) : (
@@ -462,7 +546,11 @@ export function SavingsTabContent({
                             Sisa
                           </p>
                           <p className="text-sm font-bold text-rose-500/80 italic">
-                            Rp {(goal.targetAmount - current).toLocaleString("id-ID")} lagi
+                            Rp{" "}
+                            {(goal.targetAmount - current).toLocaleString(
+                              "id-ID",
+                            )}{" "}
+                            lagi
                           </p>
                         </>
                       )}
@@ -471,11 +559,16 @@ export function SavingsTabContent({
 
                   <div className="space-y-2">
                     <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                      <span className={progress >= 100 ? "text-emerald-500" : "text-primary"}>
-                        {Math.min(progress, 999).toFixed(0)}% {progress >= 100 ? "Selesai 🎉" : "Tercapai"}
+                      <span
+                        className={
+                          progress >= 100 ? "text-emerald-500" : "text-primary"
+                        }
+                      >
+                        {Math.min(progress, 999).toFixed(0)}%{" "}
+                        {progress >= 100 ? "Selesai 🎉" : "Tercapai"}
                       </span>
                       <span className="text-muted-foreground opacity-40">
-                        Target: Rp {goal.targetAmount.toLocaleString("id-ID")}
+                        Target: {formatCurrency(goal.targetAmount, currency)}
                       </span>
                     </div>
                     <Progress
@@ -484,7 +577,7 @@ export function SavingsTabContent({
                       indicatorClassName={cn(
                         progress >= 100
                           ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]"
-                          : "bg-primary shadow-[0_0_10px_rgba(139,92,246,0.3)]"
+                          : "bg-primary shadow-[0_0_10px_rgba(139,92,246,0.3)]",
                       )}
                     />
                   </div>
@@ -505,7 +598,7 @@ export function SavingsTabContent({
           })
         ) : (
           <div className="col-span-full py-20 border-2 border-dashed border-border/40 rounded-[32px] flex flex-col items-center">
-            <EmptyState 
+            <EmptyState
               icon={Target}
               title="Belum Ada Target"
               description="Wujudkan impianmu dengan mulai menetapkan target tabungan hari ini."
@@ -522,19 +615,17 @@ export function SavingsTabContent({
       </div>
 
       <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <SheetContent 
+        <SheetContent
           side="right"
           className="w-full sm:max-w-lg bg-background/40 backdrop-blur-3xl border-l border-white/10 shadow-2xl overflow-hidden p-0 gap-0 focus:outline-none flex flex-col"
         >
-          <SheetHeader className="px-6 pt-8 pb-6 border-b border-white/5 shrink-0">
-            <SheetTitle className="text-2xl font-black">
-              Edit Target
-            </SheetTitle>
+          <SheetHeader className="px-8 pt-8 pb-6 border-b border-white/5 shrink-0">
+            <SheetTitle className="text-2xl font-black">Edit Target</SheetTitle>
             <SheetDescription className="font-medium text-muted-foreground">
               Sesuaikan target impian Anda.
             </SheetDescription>
           </SheetHeader>
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+          <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
                 Nama Impian
@@ -547,18 +638,31 @@ export function SavingsTabContent({
             </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
-                Target Nominal (Rp)
+                Target Nominal ({currency})
               </Label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/40 font-black text-sm">Rp</span>
-                <Input
+              <InputGroup className="bg-muted/10 border-white/10 rounded-xl h-12 focus-within:ring-primary/30 overflow-hidden">
+                <InputGroupAddon className="pl-4">
+                  <span
+                    className={cn(
+                      "text-muted-foreground/40 font-black transition-all duration-300",
+                      newTarget.length > 12 ? "text-[10px]" : "text-sm",
+                    )}
+                  >
+                    {currency === "USD" ? "$" : "Rp"}
+                  </span>
+                </InputGroupAddon>
+                <InputGroupInput
                   value={newTarget}
                   onChange={(e) =>
                     setNewTarget(formatCurrencyInput(e.target.value))
                   }
-                  className="rounded-xl bg-muted/10 border-white/10 h-12 font-mono font-black text-base pl-10 focus-visible:ring-primary/30"
+                  maxLength={20}
+                  className={cn(
+                    "font-mono font-black transition-all duration-300",
+                    newTarget.length <= 10 ? "text-base" : "text-xs",
+                  )}
                 />
-              </div>
+              </InputGroup>
             </div>
             <div className="space-y-3">
               <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
@@ -587,13 +691,13 @@ export function SavingsTabContent({
               </div>
             </div>
           </div>
-          <SheetFooter className="px-6 py-4 border-t border-white/5 shrink-0">
+          <SheetFooter className="px-8 py-4 border-t border-white/5 shrink-0">
             <Button
               onClick={handleEditGoal}
-              disabled={loading || !newName || !newTarget}
+              disabled={isPending || !newName || !newTarget}
               className="w-full rounded-2xl h-14 bg-primary text-primary-foreground font-black text-lg shadow-xl shadow-primary/20 disabled:opacity-40"
             >
-              {loading ? "Menyimpan..." : "Simpan Perubahan"}
+              {isPending ? "Menyimpan..." : "Simpan Perubahan"}
             </Button>
           </SheetFooter>
         </SheetContent>
@@ -623,10 +727,10 @@ export function SavingsTabContent({
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              disabled={loading}
+              disabled={isPending}
               className="flex-1 rounded-2xl h-12 bg-rose-500 hover:bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-rose-500/20 m-0"
             >
-              {loading ? "Menghapus..." : "Ya, Hapus"}
+              {isPending ? "Menghapus..." : "Ya, Hapus"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -634,11 +738,11 @@ export function SavingsTabContent({
 
       {/* Contribution Sheet */}
       <Sheet open={isContributeOpen} onOpenChange={setIsContributeOpen}>
-        <SheetContent 
+        <SheetContent
           side="right"
           className="w-full sm:max-w-lg bg-background/40 backdrop-blur-3xl border-l border-white/10 shadow-2xl overflow-hidden p-0 gap-0 focus:outline-none flex flex-col"
         >
-          <SheetHeader className="px-6 pt-8 pb-6 border-b border-white/5 shrink-0">
+          <SheetHeader className="px-8 pt-8 pb-6 border-b border-white/5 shrink-0">
             <SheetTitle className="text-2xl font-black">
               Nabung buat {selectedGoal?.name}
             </SheetTitle>
@@ -646,20 +750,22 @@ export function SavingsTabContent({
               Berapa banyak yang ingin Anda sisihkan hari ini?
             </SheetDescription>
           </SheetHeader>
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+          <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
             {/* Progress preview if goal exists */}
             {selectedGoal && (
               <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 space-y-2">
                 <div className="flex justify-between text-xs font-bold text-muted-foreground">
                   <span>Progres saat ini</span>
                   <span className="text-emerald-500">
-                    Rp {(selectedGoal.currentAmount || 0).toLocaleString("id-ID")} / Rp {selectedGoal.targetAmount.toLocaleString("id-ID")}
+                    {formatCurrency(selectedGoal.currentAmount || 0, currency)} / {formatCurrency(selectedGoal.targetAmount, currency)}
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-emerald-500/10 overflow-hidden">
                   <div
                     className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(((selectedGoal.currentAmount || 0) / selectedGoal.targetAmount) * 100, 100)}%` }}
+                    style={{
+                      width: `${Math.min(((selectedGoal.currentAmount || 0) / selectedGoal.targetAmount) * 100, 100)}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -667,26 +773,43 @@ export function SavingsTabContent({
 
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
-                Nominal Tabungan (Rp)
+                Nominal Tabungan ({currency})
               </Label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-muted-foreground/40 text-sm">
-                  Rp
-                </span>
-                <Input
+              <InputGroup className="bg-muted/10 border-white/10 rounded-xl h-16 focus-within:ring-emerald-500/30 overflow-hidden">
+                <InputGroupAddon className="pl-4">
+                  <span
+                    className={cn(
+                      "font-black text-muted-foreground/40 transition-all duration-300",
+                      contributionAmount.length > 12 ? "text-xs" : "text-sm",
+                    )}
+                  >
+                    {currency === "USD" ? "$" : "Rp"}
+                  </span>
+                </InputGroupAddon>
+                <InputGroupInput
                   placeholder="0"
                   autoFocus
                   value={contributionAmount}
                   onChange={(e) =>
                     setContributionAmount(formatCurrencyInput(e.target.value))
                   }
-                  className="rounded-xl bg-muted/10 border-white/10 h-16 pl-12 text-2xl font-mono font-black focus-visible:ring-emerald-500/30"
+                  maxLength={20}
+                  className={cn(
+                    "font-mono font-black transition-all duration-300",
+                    contributionAmount.length <= 8
+                      ? "text-2xl"
+                      : contributionAmount.length <= 12
+                        ? "text-xl"
+                        : "text-sm",
+                  )}
                 />
-              </div>
+              </InputGroup>
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">Jumlah Cepat</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
+                Jumlah Cepat
+              </p>
               <div className="grid grid-cols-3 gap-3">
                 {[50000, 100000, 500000].map((amount) => (
                   <button
@@ -699,7 +822,7 @@ export function SavingsTabContent({
                       "h-12 rounded-xl border font-bold text-sm transition-all duration-200",
                       contributionAmount === amount.toLocaleString("id-ID")
                         ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
-                        : "bg-muted/10 border-white/5 text-muted-foreground hover:border-white/20 hover:text-white"
+                        : "bg-muted/10 border-white/5 text-muted-foreground hover:border-white/20 hover:text-white",
                     )}
                   >
                     +{(amount / 1000).toLocaleString("id-ID")}k
@@ -708,13 +831,13 @@ export function SavingsTabContent({
               </div>
             </div>
           </div>
-          <SheetFooter className="px-6 py-4 border-t border-white/5 shrink-0">
+          <SheetFooter className="px-8 py-4 border-t border-white/5 shrink-0">
             <Button
               onClick={handleContribute}
-              disabled={loading || !contributionAmount}
+              disabled={isPending || !contributionAmount}
               className="w-full rounded-2xl h-14 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg shadow-xl shadow-emerald-500/20 disabled:opacity-40 transition-all"
             >
-              {loading ? "Memproses..." : "Konfirmasi Tabungan"}
+              {isPending ? "Memproses..." : "Konfirmasi Tabungan"}
               <ArrowUpRight className="ml-2 size-5" />
             </Button>
           </SheetFooter>

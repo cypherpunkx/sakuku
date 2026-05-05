@@ -13,6 +13,7 @@ interface BudgetInsightProps {
   wants: number;
   savings: number;
   overBudgetCategories?: string[];
+  currency?: string;
 }
 
 export function BudgetInsight503020(props: BudgetInsightProps) {
@@ -21,7 +22,8 @@ export function BudgetInsight503020(props: BudgetInsightProps) {
     isNeedsSafe, 
     isWantsSafe, 
     isSavingsSafe, 
-    wantsPerc 
+    wantsPerc,
+    hasIncome 
   } = useBudgetEvaluation(props);
 
   return (
@@ -46,7 +48,7 @@ export function BudgetInsight503020(props: BudgetInsightProps) {
       <CardContent className="space-y-8">
         <div className="grid gap-6 md:grid-cols-3">
           {insights.map((item) => (
-            <InsightCard key={item.label} {...item} />
+            <InsightCard key={item.label} {...item} hasIncome={hasIncome} currency={props.currency} />
           ))}
         </div>
 

@@ -8,15 +8,11 @@ import { revalidatePath } from "next/cache";
 const CURRENT_USER_ID = "user_1";
 
 import { getUser } from "./dashboard.actions";
+import { savingGoalSchema, savingContributionSchema } from "../validations";
 
-export async function addSavingGoal(formData: {
-  name: string;
-  targetAmount: number;
-  currentAmount?: number;
-  iconName?: string;
-  color?: string;
-  dueDate?: string;
-}) {
+export async function addSavingGoal(data: any) {
+  const validatedData = savingGoalSchema.parse(data);
+  const formData = validatedData;
   await db.insert(schema.savingsGoals).values({
     ...formData,
     userId: CURRENT_USER_ID,
@@ -24,17 +20,9 @@ export async function addSavingGoal(formData: {
   revalidatePath("/dashboard", "layout");
 }
 
-export async function updateSavingGoal(
-  id: number,
-  formData: Partial<{
-    name: string;
-    targetAmount: number;
-    currentAmount: number;
-    iconName: string;
-    color: string;
-    dueDate: string;
-  }>
-) {
+export async function updateSavingGoal(id: number, data: any) {
+  const validatedData = savingGoalSchema.partial().parse(data);
+  const formData = validatedData;
   await db.update(schema.savingsGoals).set({
     ...formData,
   }).where(eq(schema.savingsGoals.id, id));
@@ -54,6 +42,7 @@ export async function deleteSavingGoal(id: number) {
 }
 
 export async function addSavingContribution(id: number, amount: number) {
+  savingContributionSchema.parse({ goalId: id, amount });
   const goal = await db.query.savingsGoals.findFirst({
     where: eq(schema.savingsGoals.id, id),
   });
@@ -79,7 +68,7 @@ export async function addSavingContribution(id: number, amount: number) {
         name: "Tabungan",
         type: "expense",
         icon: "TrendingUp",
-        priority: "Sekunder",
+        priority: "Tabungan",
         color: "#10b981",
       })
       .returning();

@@ -19,7 +19,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center text-center p-8 space-y-4",
+        "flex flex-col items-center justify-center text-center p-8 space-y-4 w-full",
         className
       )}
     >
@@ -28,12 +28,12 @@ export function EmptyState({
           <Icon className="size-12" />
         </div>
       )}
-      <div className="space-y-1">
-        <h3 className="text-lg font-black uppercase tracking-[0.2em] text-muted-foreground/80">
+      <div className="space-y-1 flex flex-col items-center w-full">
+        <h3 className="text-lg font-black uppercase tracking-[0.2em] text-muted-foreground/80 text-center w-full">
           {title}
         </h3>
         {description && (
-          <p className="text-sm font-medium text-muted-foreground/70 max-w-[280px] mx-auto">
+          <p className="text-sm font-medium text-muted-foreground/70 max-w-[400px] text-center w-full">
             {description}
           </p>
         )}

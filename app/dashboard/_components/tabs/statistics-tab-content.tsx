@@ -28,6 +28,8 @@ import {
   Calendar,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { EmptyState } from "../empty-state";
+import { Wallet } from "lucide-react";
 
 interface StatisticsTabContentProps {
   dailyStats: {
@@ -46,6 +48,8 @@ interface StatisticsTabContentProps {
     prevExpense: number;
   };
 }
+
+import { CHART_COLORS } from "@/lib/constants";
 
 export function StatisticsTabContent({
   dailyStats,
@@ -89,6 +93,9 @@ export function StatisticsTabContent({
   // Process Category Stats for Phase 2
   const sortedCategories = [...categoryStats].sort((a, b) => b.value - a.value);
   const topCategories = sortedCategories.slice(0, 5);
+
+  const hasChartData = dailyStats.some((d) => d.income > 0 || d.expense > 0);
+  const hasCategoryData = categoryStats.length > 0;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -216,6 +223,10 @@ export function StatisticsTabContent({
         const projectedFinalBalance = totalIncome - projectedTotalExpense;
 
         const isSafe = projectedFinalBalance >= 0;
+        
+        // Kalkulasi batas belanja harian aman agar tidak defisit
+        const remainingBudget = totalIncome - totalExpense;
+        const safeDailyBudget = remainingBudget > 0 ? remainingBudget / remainingDays : 0;
 
         return (
           <Card className="border-primary/20 bg-primary/5 backdrop-blur-xl relative overflow-hidden animate-in zoom-in-95 duration-500">
@@ -255,7 +266,12 @@ export function StatisticsTabContent({
                         "id-ID",
                       )}
                     </span>{" "}
-                    hingga akhir bulan.
+                    hingga akhir bulan. 
+                    {safeDailyBudget > 0 && !isSafe && (
+                      <span className="block mt-1 text-amber-500 font-bold italic">
+                        Tips: Batasi belanja Anda menjadi Rp {Math.round(safeDailyBudget).toLocaleString("id-ID")}/hari agar saldo tetap positif.
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div
@@ -301,7 +317,7 @@ export function StatisticsTabContent({
             <CardTitle className="text-xl font-black tracking-tight">
               Tren Arus Kas
             </CardTitle>
-            <CardDescription className="font-medium text-muted-foreground/60">
+            <CardDescription className="font-medium text-muted-foreground/90">
               Visualisasi pergerakan uang masuk dan keluar.
             </CardDescription>
           </div>
@@ -321,96 +337,105 @@ export function StatisticsTabContent({
           </div>
         </CardHeader>
         <CardContent className="h-[400px] w-full pt-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={chartData}
-              margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
-            >
-              <defs>
-                <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis
-                dataKey="formattedDate"
-                axisLine={false}
-                tickLine={false}
-                tick={{
-                  fill: "rgba(255,255,255,0.3)",
-                  fontSize: 10,
-                  fontWeight: 800,
-                }}
-                minTickGap={30}
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                tick={{
-                  fill: "rgba(255,255,255,0.4)",
-                  fontSize: 10,
-                  fontWeight: 600,
-                }}
-                tickFormatter={(val) => {
-                  if (val >= 1000000)
-                    return `${(val / 1000000).toFixed(1).replace(".0", "")} Jt`;
-                  if (val >= 1000) return `${val / 1000} rb`;
-                  return val;
-                }}
-                width={60}
-              />
-              <Tooltip
-                cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }}
-                contentStyle={{
-                  backgroundColor: "rgba(9, 9, 11, 0.8)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: "20px",
-                  backdropFilter: "blur(20px)",
-                  boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
-                  padding: "12px 16px",
-                }}
-                itemStyle={{
-                  fontSize: "12px",
-                  fontWeight: 900,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-                labelStyle={{
-                  color: "rgba(255,255,255,0.4)",
-                  fontSize: "10px",
-                  marginBottom: "8px",
-                  fontWeight: 800,
-                }}
-                formatter={(value: any) => [
-                  `Rp ${Number(value || 0).toLocaleString("id-ID")}`,
-                ]}
-              />
-              <Area
-                type="monotone"
-                dataKey="income"
-                stroke="#10b981"
-                strokeWidth={4}
-                fillOpacity={1}
-                fill="url(#colorIncome)"
-                animationDuration={2000}
-                strokeLinecap="round"
-              />
-              <Area
-                type="monotone"
-                dataKey="expense"
-                stroke="#f43f5e"
-                strokeWidth={4}
-                fillOpacity={1}
-                fill="url(#colorExpense)"
-                animationDuration={2000}
-                strokeLinecap="round"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          {hasChartData ? (
+            <ResponsiveContainer width="100%" height="100%" debounce={100}>
+              <AreaChart
+                data={chartData}
+                margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis
+                  dataKey="formattedDate"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{
+                    fill: "rgba(255,255,255,0.3)",
+                    fontSize: 10,
+                    fontWeight: 800,
+                  }}
+                  minTickGap={30}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{
+                    fill: "rgba(255,255,255,0.4)",
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
+                  tickFormatter={(val) => {
+                    if (val >= 1000000)
+                      return `${(val / 1000000).toFixed(1).replace(".0", "")} Jt`;
+                    if (val >= 1000) return `${val / 1000} rb`;
+                    return val;
+                  }}
+                  width={60}
+                />
+                <Tooltip
+                  cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }}
+                  contentStyle={{
+                    backgroundColor: "rgba(9, 9, 11, 0.8)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    borderRadius: "20px",
+                    backdropFilter: "blur(20px)",
+                    boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
+                    padding: "12px 16px",
+                  }}
+                  itemStyle={{
+                    fontSize: "12px",
+                    fontWeight: 900,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                  labelStyle={{
+                    color: "rgba(255,255,255,0.4)",
+                    fontSize: "10px",
+                    marginBottom: "8px",
+                    fontWeight: 800,
+                  }}
+                  formatter={(value: any) => [
+                    `Rp ${Number(value || 0).toLocaleString("id-ID")}`,
+                  ]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="income"
+                  stroke="#10b981"
+                  strokeWidth={4}
+                  fillOpacity={1}
+                  fill="url(#colorIncome)"
+                  animationDuration={2000}
+                  strokeLinecap="round"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="expense"
+                  stroke="#f43f5e"
+                  strokeWidth={4}
+                  fillOpacity={1}
+                  fill="url(#colorExpense)"
+                  animationDuration={2000}
+                  strokeLinecap="round"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState
+              icon={Wallet}
+              title="Belum Ada Data"
+              description="Catat transaksi pertama Anda untuk melihat visualisasi tren arus kas."
+              className="h-full"
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -424,49 +449,61 @@ export function StatisticsTabContent({
                 Distribusi Pengeluaran
               </CardTitle>
             </div>
-            <CardDescription className="font-medium text-muted-foreground/60">
+            <CardDescription className="font-medium text-muted-foreground/90">
               Persentase belanja per kategori bulan ini.
             </CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={categoryStats}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {categoryStats.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={entry.color || "hsl(var(--primary))"}
-                      className="opacity-80 hover:opacity-100 transition-opacity duration-300"
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "rgba(9, 9, 11, 0.9)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    borderRadius: "16px",
-                    backdropFilter: "blur(16px)",
-                  }}
-                  itemStyle={{
-                    fontSize: "10px",
-                    fontWeight: 900,
-                    textTransform: "uppercase",
-                  }}
-                  formatter={(value: any) => [
-                    `Rp ${Number(value || 0).toLocaleString("id-ID")}`,
-                  ]}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            {hasCategoryData ? (
+              <ResponsiveContainer width="100%" height="100%" debounce={100}>
+                <PieChart>
+                  <Pie
+                    data={categoryStats}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {categoryStats.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={
+                          entry.color ||
+                          CHART_COLORS[index % CHART_COLORS.length]
+                        }
+                        className="opacity-80 hover:opacity-100 transition-opacity duration-300"
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "rgba(9, 9, 11, 0.9)",
+                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                      borderRadius: "16px",
+                      backdropFilter: "blur(16px)",
+                    }}
+                    itemStyle={{
+                      fontSize: "10px",
+                      fontWeight: 900,
+                      textTransform: "uppercase",
+                    }}
+                    formatter={(value: any) => [
+                      `Rp ${Number(value || 0).toLocaleString("id-ID")}`,
+                    ]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState
+                icon={PieIcon}
+                title="Tidak Ada Data"
+                description="Belum ada pengeluaran berdasarkan kategori bulan ini."
+                className="h-full"
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -475,48 +512,58 @@ export function StatisticsTabContent({
             <CardTitle className="text-lg font-black tracking-tight">
               Kategori Terpopuler
             </CardTitle>
-            <CardDescription className="font-medium text-muted-foreground/60">
+            <CardDescription className="font-medium text-muted-foreground/90">
               5 kategori dengan pengeluaran tertinggi.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {topCategories.map((cat, i) => {
-              const percentage =
-                totalExpense > 0 ? (cat.value / totalExpense) * 100 : 0;
-              return (
-                <div key={i} className="space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="flex items-center gap-2">
-                      <div
-                        className="size-2 rounded-full"
-                        style={{
-                          backgroundColor: cat.color || "hsl(var(--primary))",
-                        }}
-                      />
-                      {cat.name}
-                    </span>
-                    <span className="text-muted-foreground">
-                      {percentage.toFixed(1)}%
-                    </span>
+            {hasCategoryData ? (
+              topCategories.map((cat, i) => {
+                const percentage =
+                  totalExpense > 0 ? (cat.value / totalExpense) * 100 : 0;
+                // Get the same color logic for consistency
+                const catColor =
+                  cat.color || CHART_COLORS[i % CHART_COLORS.length];
+
+                return (
+                  <div key={i} className="space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span className="flex items-center gap-2">
+                        <div
+                          className="size-2 rounded-full"
+                          style={{
+                            backgroundColor: catColor,
+                          }}
+                        />
+                        {cat.name}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {percentage.toFixed(1)}%
+                      </span>
+                    </div>
+                    <Progress
+                      value={percentage}
+                      className="h-1.5 bg-white/5"
+                      indicatorClassName="transition-all duration-1000"
+                      style={
+                        {
+                          "--progress-foreground": catColor,
+                        } as React.CSSProperties
+                      }
+                    />
+                    <div className="text-[10px] font-black text-muted-foreground/75 text-right uppercase tracking-widest">
+                      Rp {cat.value.toLocaleString("id-ID")}
+                    </div>
                   </div>
-                  <Progress
-                    value={percentage}
-                    className="h-1.5 bg-white/5"
-                    indicatorClassName="transition-all duration-1000"
-                    style={
-                      {
-                        // @ts-ignore - custom indicator color via inline style if indicatorClassName doesn't support dynamic colors well
-                        "--progress-foreground":
-                          cat.color || "hsl(var(--primary))",
-                      } as React.CSSProperties
-                    }
-                  />
-                  <div className="text-[10px] font-black text-muted-foreground/40 text-right uppercase tracking-widest">
-                    Rp {cat.value.toLocaleString("id-ID")}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              <EmptyState
+                title="List Kosong"
+                description="Catatan pengeluaran Anda akan muncul di sini."
+                className="py-12"
+              />
+            )}
           </CardContent>
         </Card>
       </div>
@@ -526,7 +573,7 @@ export function StatisticsTabContent({
           <CardTitle className="text-lg font-black tracking-tight">
             Intensitas Pengeluaran Harian
           </CardTitle>
-          <CardDescription className="font-medium text-muted-foreground/60">
+          <CardDescription className="font-medium text-muted-foreground/90">
             Mendeteksi pola hari-hari dengan pengeluaran tinggi bulan ini.
           </CardDescription>
         </CardHeader>
@@ -562,6 +609,8 @@ export function StatisticsTabContent({
                 return (
                   <div key={day} className="group relative">
                     <div
+                      role="img"
+                      aria-label={`Tanggal ${day} ${dateObj.toLocaleDateString("id-ID", { month: "long" })}: Rp ${expense.toLocaleString("id-ID")}`}
                       className={cn(
                         "size-8 md:size-10 rounded-lg transition-all duration-300 border border-white/5 cursor-help",
                         intensity === 0 && "bg-white/5",
@@ -574,7 +623,7 @@ export function StatisticsTabContent({
                     />
                     {/* Custom Tooltip */}
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-zinc-900 border border-white/10 rounded-xl text-[10px] font-black whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl">
-                      <div className="text-white/40 mb-1">
+                      <div className="text-white/80 mb-1">
                         {day}{" "}
                         {dateObj.toLocaleDateString("id-ID", { month: "long" })}
                       </div>

@@ -21,7 +21,7 @@ export async function getLearningData(search: string = "") {
         : undefined,
     );
 
-  const externalNews = await fetchExternalNews();
+  const externalNews = await fetchExternalNews(search);
   const allAvailableArticles = [...articles, ...externalNews];
 
   // Filter for search if search exists
@@ -29,7 +29,8 @@ export async function getLearningData(search: string = "") {
     ? allAvailableArticles.filter(
         (a) =>
           a.title?.toLowerCase().includes(search.toLowerCase()) ||
-          a.category?.toLowerCase().includes(search.toLowerCase()),
+          a.category?.toLowerCase().includes(search.toLowerCase()) ||
+          a.content?.toLowerCase().includes(search.toLowerCase()),
       )
     : allAvailableArticles;
 
@@ -204,17 +205,22 @@ export async function toggleBookmark(articleId: number) {
   revalidatePath("/dashboard", "layout");
 }
 
-async function fetchExternalNews() {
+async function fetchExternalNews(search: string = "") {
   const API_KEY = process.env.NEWS_API_KEY;
   if (!API_KEY) {
     console.warn("NewsAPI Key is missing in environment variables.");
     return [];
   }
-  const query = encodeURIComponent("keuangan OR investasi OR tabungan");
+  
+  // Jika ada pencarian, gunakan kata kunci pencarian + konteks keuangan
+  // Jika tidak, gunakan kueri default
+  const query = search 
+    ? encodeURIComponent(`(${search}) AND (keuangan OR bisnis OR investasi OR tabungan OR bank)`)
+    : encodeURIComponent("keuangan OR investasi OR tabungan");
 
   try {
     const response = await fetch(
-      `https://newsapi.org/v2/everything?q=${query}&language=id&sortBy=publishedAt&pageSize=5&apiKey=${API_KEY}`,
+      `https://newsapi.org/v2/everything?q=${query}&language=id&sortBy=publishedAt&pageSize=10&apiKey=${API_KEY}`,
       { next: { revalidate: 3600 } }, // Cache selama 1 jam
     );
 
@@ -237,7 +243,7 @@ async function fetchExternalNews() {
           art.content ||
           "Klik untuk membaca selengkapnya...",
         category: "Berita",
-        read_time: `${readMinutes} mnt baca`,
+        readTime: `${readMinutes} mnt baca`,
         color: index % 2 === 0 ? "indigo" : "blue",
         isExternal: true,
         url: art.url,

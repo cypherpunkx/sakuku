@@ -24,6 +24,27 @@ export function useBudgetEvaluation({ totalIncome, needs, wants, savings }: Budg
     const isWantsSafe = wantsPerc <= 30;
     const isSavingsSafe = savingsPerc >= 20;
 
+    type InsightStatus = "safe" | "warning" | "danger";
+
+    // Detailed status for better UX
+    const getNeedsStatus = (): InsightStatus => {
+      if (needsPerc > 50) return "danger";
+      if (needsPerc > 45) return "warning";
+      return "safe";
+    };
+
+    const getWantsStatus = (): InsightStatus => {
+      if (wantsPerc > 30) return "danger";
+      if (wantsPerc > 25) return "warning";
+      return "safe";
+    };
+
+    const getSavingsStatus = (): InsightStatus => {
+      if (savingsPerc >= 20) return "safe";
+      if (savingsPerc >= 15) return "warning";
+      return "danger";
+    };
+
     const insights = [
       {
         label: "Kebutuhan (Needs)",
@@ -33,6 +54,7 @@ export function useBudgetEvaluation({ totalIncome, needs, wants, savings }: Budg
         limitAmount: income * 0.5,
         color: "bg-rose-500",
         isSafe: isNeedsSafe,
+        status: getNeedsStatus(),
         description: "Sewa, tagihan, makanan pokok, dan transportasi wajib.",
       },
       {
@@ -43,6 +65,7 @@ export function useBudgetEvaluation({ totalIncome, needs, wants, savings }: Budg
         limitAmount: income * 0.3,
         color: "bg-amber-500",
         isSafe: isWantsSafe,
+        status: getWantsStatus(),
         description: "Hiburan, belanja hobi, dan makan di luar.",
       },
       {
@@ -53,6 +76,7 @@ export function useBudgetEvaluation({ totalIncome, needs, wants, savings }: Budg
         limitAmount: income * 0.2,
         color: "bg-emerald-500",
         isSafe: isSavingsSafe,
+        status: getSavingsStatus(),
         description: "Tabungan darurat, investasi, dan cicilan hutang.",
       },
     ];
@@ -65,6 +89,7 @@ export function useBudgetEvaluation({ totalIncome, needs, wants, savings }: Budg
       needsPerc,
       wantsPerc,
       savingsPerc,
+      hasIncome: income > 0,
     };
   }, [totalIncome, needs, wants, savings]);
 }
