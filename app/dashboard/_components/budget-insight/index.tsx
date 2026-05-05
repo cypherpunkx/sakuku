@@ -27,7 +27,7 @@ export function BudgetInsight503020(props: BudgetInsightProps) {
   } = useBudgetEvaluation(props);
 
   return (
-    <Card className="border-primary/20 bg-primary/5 backdrop-blur-md relative overflow-hidden">
+    <Card className="border-primary/20 bg-primary/5 backdrop-blur-md rounded-3xl relative overflow-hidden">
       <div className="absolute -right-8 -top-8 size-32 bg-primary/10 rounded-full blur-3xl" />
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
