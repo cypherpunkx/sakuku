@@ -1,10 +1,11 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull(),
+  password: text("password"),
   image: text("image"),
   balance: integer("balance").default(0),
   currency: text("currency").default("IDR"),
@@ -13,6 +14,8 @@ export const users = sqliteTable("users", {
   emailNotifications: integer("email_notifications", { mode: "boolean" }).default(true),
   pushNotifications: integer("push_notifications", { mode: "boolean" }).default(true),
   weeklyReport: integer("weekly_report", { mode: "boolean" }).default(true),
+  hasOnboarding: integer("has_onboarding", { mode: "boolean" }).default(false),
+  createdAt: text("created_at"),
 });
 
 export const categories = sqliteTable("categories", {

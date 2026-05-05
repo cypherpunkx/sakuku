@@ -154,3 +154,15 @@
 @utility bg-gradient-card {
   background-image: linear-gradient(to bottom right, color-mix(in srgb, var(--card), transparent 20%), color-mix(in srgb, var(--card), transparent 60%), transparent);
 }
+
+/* Remove spinners from number inputs */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

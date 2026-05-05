@@ -2,14 +2,22 @@
 
 import { db } from "../db";
 import * as schema from "../db/schema";
-import { eq, and, desc, sql, or, like, SQL, gte, lte } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { eq, and, desc, sql, SQL, gte, lte } from "drizzle-orm";
 
-const CURRENT_USER_ID = "user_1";
+import { getSession } from "../session";
+
+async function getAuthenticatedUserId() {
+  const session = await getSession();
+  if (!session?.userId) {
+    throw new Error("Unauthorized");
+  }
+  return session.userId as string;
+}
 
 export async function getUser() {
+  const userId = await getAuthenticatedUserId();
   return await db.query.users.findFirst({
-    where: eq(schema.users.id, CURRENT_USER_ID),
+    where: eq(schema.users.id, userId),
   });
 }
 
@@ -17,7 +25,10 @@ export async function getUser() {
  * Mendapatkan rentang tanggal untuk periode anggaran saat ini berdasarkan budgetStartDay user.
  * Contoh: Jika budgetStartDay = 25 dan hari ini 10 Mei, maka rentangnya adalah 25 April - 24 Mei.
  */
-export async function getBudgetPeriodRange(startDay: number = 1, referenceDate: Date = new Date()) {
+export async function getBudgetPeriodRange(
+  startDay: number = 1,
+  referenceDate: Date = new Date(),
+) {
   const now = referenceDate;
   let startDate: Date;
   let endDate: Date;
@@ -35,7 +46,7 @@ export async function getBudgetPeriodRange(startDay: number = 1, referenceDate: 
   // Format ke YYYY-MM-DD untuk SQLite
   const startStr = startDate.toISOString().split("T")[0];
   const endStr = endDate.toISOString().split("T")[0];
-  
+
   // Period label (YYYY-MM) - Kita gunakan bulan di mana periode ini berakhir sebagai label
   const periodLabel = endDate.toISOString().split("T")[0].slice(0, 7);
 
@@ -45,20 +56,27 @@ export async function getBudgetPeriodRange(startDay: number = 1, referenceDate: 
 export async function getStatisticsData(monthStr?: string) {
   const user = await getUser();
   const startDay = user?.budgetStartDay || 1;
-  
+
   // Tentukan tanggal referensi (jika monthStr "2026-05", gunakan akhir bulan tersebut sebagai referensi)
   let referenceDate = new Date();
   if (monthStr) {
     const [year, month] = monthStr.split("-").map(Number);
-    referenceDate = new Date(year, month - 1, startDay); 
+    referenceDate = new Date(year, month - 1, startDay);
   }
 
-  const { startStr, endStr, periodLabel: targetMonth } = await getBudgetPeriodRange(startDay, referenceDate);
+  const {
+    startStr,
+    endStr,
+    periodLabel: targetMonth,
+  } = await getBudgetPeriodRange(startDay, referenceDate);
 
   // Hitung periode sebelumnya untuk perbandingan
   const prevRefDate = new Date(referenceDate);
   prevRefDate.setMonth(prevRefDate.getMonth() - 1);
-  const { startStr: prevStart, endStr: prevEnd } = await getBudgetPeriodRange(startDay, prevRefDate);
+  const { startStr: prevStart, endStr: prevEnd } = await getBudgetPeriodRange(
+    startDay,
+    prevRefDate,
+  );
 
   // Get daily income and expense for the target month
   const dailyStats = await db
@@ -72,8 +90,8 @@ export async function getStatisticsData(monthStr?: string) {
       and(
         gte(schema.transactions.date, startStr),
         lte(schema.transactions.date, endStr),
-        eq(schema.transactions.userId, CURRENT_USER_ID)
-      )
+        eq(schema.transactions.userId, await getAuthenticatedUserId()),
+      ),
     )
     .groupBy(sql`strftime('%Y-%m-%d', ${schema.transactions.date})`)
     .orderBy(sql`strftime('%Y-%m-%d', ${schema.transactions.date})`);
@@ -89,8 +107,8 @@ export async function getStatisticsData(monthStr?: string) {
       and(
         gte(schema.transactions.date, prevStart),
         lte(schema.transactions.date, prevEnd),
-        eq(schema.transactions.userId, CURRENT_USER_ID)
-      )
+        eq(schema.transactions.userId, await getAuthenticatedUserId()),
+      ),
     );
 
   // Get category distribution for the target month
@@ -110,7 +128,7 @@ export async function getStatisticsData(monthStr?: string) {
         eq(schema.transactions.type, "expense"),
         gte(schema.transactions.date, startStr),
         lte(schema.transactions.date, endStr),
-        eq(schema.transactions.userId, CURRENT_USER_ID)
+        eq(schema.transactions.userId, await getAuthenticatedUserId()),
       ),
     )
     .groupBy(schema.categories.id);
@@ -144,49 +162,67 @@ export async function getSummaryData(range: string = "monthly") {
     // Monthly (Budget Cycle)
     dateFilter = and(
       gte(schema.transactions.date, startStr),
-      lte(schema.transactions.date, endStr)
+      lte(schema.transactions.date, endStr),
     );
   }
 
   // Tambahkan filter userId
-  const finalFilter = and(dateFilter, eq(schema.transactions.userId, CURRENT_USER_ID));
+  const finalFilter = and(
+    dateFilter,
+    eq(schema.transactions.userId, await getAuthenticatedUserId()),
+  );
 
-  const [balanceResult, rangeIncomeSummary, expenseSummary] = await Promise.all([
-    // 1. Saldo Total (Seluruh Waktu)
-    db
-      .select({
-        income: sql<number>`sum(case when type = 'income' then amount else 0 end)`,
-        expense: sql<number>`sum(case when type = 'expense' then amount else 0 end)`,
-      })
-      .from(schema.transactions)
-      .where(eq(schema.transactions.userId, CURRENT_USER_ID)),
-    
-    // 2. Pendapatan Periode Ini
-    db
-      .select({ total: sql<number>`sum(${schema.transactions.amount})` })
-      .from(schema.transactions)
-      .where(and(eq(schema.transactions.type, "income"), finalFilter)),
-    
-    // 3. Pengeluaran Periode Ini per Prioritas (Kebutuhan vs Keinginan)
-    db
-      .select({
-        priority: schema.categories.priority,
-        total: sql<number>`sum(${schema.transactions.amount})`,
-      })
-      .from(schema.transactions)
-      .innerJoin(
-        schema.categories,
-        eq(schema.transactions.categoryId, schema.categories.id),
-      )
-      .where(and(eq(schema.transactions.type, "expense"), finalFilter))
-      .groupBy(schema.categories.priority),
-  ]);
+  const [balanceResult, rangeIncomeSummary, expenseSummary] = await Promise.all(
+    [
+      // 1. Saldo Total (Seluruh Waktu)
+      db
+        .select({
+          income: sql<number>`sum(case when type = 'income' then amount else 0 end)`,
+          expense: sql<number>`sum(case when type = 'expense' then amount else 0 end)`,
+        })
+        .from(schema.transactions)
+        .where(eq(schema.transactions.userId, await getAuthenticatedUserId())),
 
-  const currentBalance = Number(balanceResult[0]?.income ?? 0) - Number(balanceResult[0]?.expense ?? 0);
+      // 2. Pendapatan Periode Ini
+      db
+        .select({ total: sql<number>`sum(${schema.transactions.amount})` })
+        .from(schema.transactions)
+        .where(and(eq(schema.transactions.type, "income"), finalFilter)),
+
+      // 3. Pengeluaran Periode Ini per Prioritas (Kebutuhan vs Keinginan)
+      db
+        .select({
+          priority: schema.categories.priority,
+          total: sql<number>`sum(${schema.transactions.amount})`,
+        })
+        .from(schema.transactions)
+        .leftJoin(
+          schema.categories,
+          eq(schema.transactions.categoryId, schema.categories.id),
+        )
+        .where(and(eq(schema.transactions.type, "expense"), finalFilter))
+        .groupBy(schema.categories.priority),
+    ],
+  );
+
+  const currentBalance =
+    Number(balanceResult[0]?.income ?? 0) -
+    Number(balanceResult[0]?.expense ?? 0);
   const monthlyIncome = Number(rangeIncomeSummary[0]?.total ?? 0);
+
+  // Perhitungan pengeluaran yang lebih robust
+  const monthlyKebutuhan = Number(
+    expenseSummary.find((s) => s.priority === "Kebutuhan")?.total ?? 0,
+  );
   
-  const monthlyKebutuhan = Number(expenseSummary.find((s) => s.priority === "Kebutuhan")?.total ?? 0);
-  const monthlyKeinginan = Number(expenseSummary.find((s) => s.priority === "Keinginan")?.total ?? 0);
+  // Semua yang bukan kebutuhan dianggap keinginan (termasuk Lainnya atau Tanpa Kategori)
+  const totalExpenses = Number(balanceResult[0]?.expense ?? 0); // Total pengeluaran (filtered by time in finalFilter? No, balanceResult is all-time)
+  
+  // Wait, balanceResult is all time. I need monthly total expenses.
+  // Let's get it from expenseSummary sum
+  const monthlyTotalExpenses = expenseSummary.reduce((acc, curr) => acc + Number(curr.total ?? 0), 0);
+  const monthlyKeinginan = monthlyTotalExpenses - monthlyKebutuhan;
+
 
   const currency = user?.currency || "IDR";
 
@@ -206,11 +242,12 @@ export async function getSummaryData(range: string = "monthly") {
 export async function getBudgetData() {
   const user = await getUser();
   const startDay = user?.budgetStartDay || 1;
-  const { startStr, endStr, periodLabel } = await getBudgetPeriodRange(startDay);
+  const { startStr, endStr, periodLabel } =
+    await getBudgetPeriodRange(startDay);
 
   const dateFilter = and(
     gte(schema.transactions.date, startStr),
-    lte(schema.transactions.date, endStr)
+    lte(schema.transactions.date, endStr),
   );
 
   const [categories, budgets] = await Promise.all([
@@ -227,7 +264,7 @@ export async function getBudgetData() {
       },
       where: and(
         eq(schema.budgets.period, periodLabel),
-        eq(schema.budgets.userId, CURRENT_USER_ID),
+        eq(schema.budgets.userId, await getAuthenticatedUserId()),
       ),
     }),
   ]);
@@ -265,15 +302,20 @@ export async function getTransactionsData(
   } else {
     dateFilter = and(
       gte(schema.transactions.date, startStr),
-      lte(schema.transactions.date, endStr)
+      lte(schema.transactions.date, endStr),
     );
   }
 
   const categories = await db.query.categories.findMany();
-  const filters: (SQL | undefined)[] = [dateFilter, eq(schema.transactions.userId, CURRENT_USER_ID)];
+  const filters: (SQL | undefined)[] = [
+    dateFilter,
+    eq(schema.transactions.userId, await getAuthenticatedUserId()),
+  ];
 
   if (search) {
-    filters.push(sql`${schema.transactions.description} LIKE ${"%" + search + "%"}`);
+    filters.push(
+      sql`${schema.transactions.description} LIKE ${"%" + search + "%"}`,
+    );
   }
 
   if (category !== "all") {
@@ -310,7 +352,13 @@ export async function getTransactionsData(
         schema.categories,
         eq(schema.transactions.categoryId, schema.categories.id),
       )
-      .where(and(eq(schema.transactions.type, "expense"), dateFilter, eq(schema.transactions.userId, CURRENT_USER_ID)))
+      .where(
+        and(
+          eq(schema.transactions.type, "expense"),
+          dateFilter,
+          eq(schema.transactions.userId, await getAuthenticatedUserId()),
+        ),
+      )
       .groupBy(schema.categories.id),
   ]);
 
@@ -345,14 +393,14 @@ export async function getTransactionsData(
 
 export async function getBillsData() {
   return await db.query.bills.findMany({
-    where: eq(schema.bills.userId, CURRENT_USER_ID),
+    where: eq(schema.bills.userId, await getAuthenticatedUserId()),
     orderBy: [schema.bills.dueDate],
   });
 }
 
 export async function getSavingsData() {
   return await db.query.savingsGoals.findMany({
-    where: eq(schema.savingsGoals.userId, CURRENT_USER_ID),
+    where: eq(schema.savingsGoals.userId, await getAuthenticatedUserId()),
   });
 }
 
@@ -367,13 +415,14 @@ export async function getDashboardData(
   category: string = "all",
 ) {
   // Shortcut: Menggabungkan hasil dari fungsi-fungsi granular
-  const [summary, budget, transactions, bills, savingsGoals] = await Promise.all([
-    getSummaryData(range),
-    getBudgetData(),
-    getTransactionsData(range, page, pageSize, search, category),
-    getBillsData(),
-    getSavingsData(),
-  ]);
+  const [summary, budget, transactions, bills, savingsGoals] =
+    await Promise.all([
+      getSummaryData(range),
+      getBudgetData(),
+      getTransactionsData(range, page, pageSize, search, category),
+      getBillsData(),
+      getSavingsData(),
+    ]);
 
   return {
     ...summary,
@@ -383,4 +432,3 @@ export async function getDashboardData(
     savingsGoals,
   };
 }
-

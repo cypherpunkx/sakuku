@@ -610,16 +610,13 @@ export function ExpenseTabContent({
               <Table className="w-full">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-muted/30">
-                    <TableHead className="w-[120px] text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4 pl-6">
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4 pl-6">
                       Tanggal
                     </TableHead>
                     <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4">
-                      Keterangan
+                      Keterangan & Kategori
                     </TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4">
-                      Kategori
-                    </TableHead>
-                    <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4">
+                    <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4 pr-6">
                       Jumlah
                     </TableHead>
                     <TableHead className="w-[50px] py-4"></TableHead>
@@ -638,41 +635,57 @@ export function ExpenseTabContent({
                           month: "short",
                         })}
                       </TableCell>
-                      <TableCell className="font-medium">
-                        {row.description || row.store}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <Badge
-                            variant="secondary"
-                            className="w-fit font-normal bg-muted/40"
-                          >
-                            {row.category?.name || "Lainnya"}
-                          </Badge>
-                          {row.type === "expense" && row.category?.priority && (
-                            <span
-                              className={cn(
-                                "text-[8px] font-black uppercase tracking-widest ml-1",
-                                row.category.priority === "Kebutuhan"
-                                  ? "text-rose-500"
-                                  : "text-amber-500",
-                              )}
+                      <TableCell className="py-4 pl-6">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="font-bold text-sm text-white tracking-tight">
+                            {row.description || row.store}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[10px] font-bold"
+                              style={{ 
+                                backgroundColor: row.category?.color ? `${row.category.color}10` : undefined,
+                                color: row.category?.color || undefined,
+                                borderColor: row.category?.color ? `${row.category.color}25` : undefined
+                              }}
                             >
-                              {row.category.priority}
-                            </span>
-                          )}
+                              {row.category?.name || "Lainnya"}
+                            </div>
+                            {row.type === "expense" && row.category?.priority && (
+                              <>
+                                <div className="size-1 rounded-full bg-white/10" />
+                                <span
+                                  className={cn(
+                                    "text-[9px] font-black uppercase tracking-widest opacity-40",
+                                    row.category.priority === "Kebutuhan"
+                                      ? "text-rose-500"
+                                      : "text-amber-500",
+                                  )}
+                                >
+                                  {row.category.priority}
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell
-                        className={cn(
-                          "text-right font-mono font-bold",
-                          row.type === "income"
-                            ? "text-emerald-500"
-                            : "text-rose-500",
-                        )}
-                      >
-                        {row.type === "income" ? "+" : "-"}
-                        {formatCurrency(row.amount, currency)}
+                      <TableCell className="text-right py-4 pr-6">
+                        <div className="flex flex-col items-end gap-1">
+                          <span
+                            className={cn(
+                              "font-mono font-bold text-base",
+                              row.type === "income"
+                                ? "text-emerald-500"
+                                : "text-rose-500",
+                            )}
+                          >
+                            {row.type === "income" ? "+" : "-"}Rp{" "}
+                            {row.amount.toLocaleString("id-ID")}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/30 font-bold uppercase tracking-widest">
+                            {row.type === "income" ? "Pemasukan" : "Pengeluaran"}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right pr-6">
                         <DropdownMenu>

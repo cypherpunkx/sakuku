@@ -5,8 +5,7 @@ import * as schema from "../db/schema";
 import { eq, and, desc, sql, or, like, SQL } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-const CURRENT_USER_ID = "user_1";
-
+import { getUserId } from "../session";
 import { getUser } from "./dashboard.actions";
 
 import { transactionSchema } from "../validations";
@@ -35,7 +34,7 @@ export async function addTransaction(data: any) {
     description: formData.description || formData.categoryName,
     store: formData.store,
     date: formData.date || new Date().toLocaleDateString("en-CA"),
-    userId: CURRENT_USER_ID,
+    userId: await getUserId(),
   });
 
   const user = await getUser();
@@ -44,7 +43,7 @@ export async function addTransaction(data: any) {
       formData.type === "income"
         ? (user.balance ?? 0) + formData.amount
         : (user.balance ?? 0) - formData.amount;
-    await db.update(schema.users).set({ balance: newBalance }).where(eq(schema.users.id, CURRENT_USER_ID));
+    await db.update(schema.users).set({ balance: newBalance }).where(eq(schema.users.id, await getUserId()));
   }
 
   revalidatePath("/dashboard", "layout");
@@ -90,7 +89,7 @@ export async function updateTransaction(id: number, data: any) {
     if (formData.type === "income") balance += formData.amount;
     else balance -= formData.amount;
 
-    await db.update(schema.users).set({ balance }).where(eq(schema.users.id, CURRENT_USER_ID));
+    await db.update(schema.users).set({ balance }).where(eq(schema.users.id, await getUserId()));
   }
 
   revalidatePath("/dashboard", "layout");
@@ -118,7 +117,7 @@ export async function deleteTransaction(id: number) {
     await db
       .update(schema.users)
       .set({ balance: newBalance })
-      .where(eq(schema.users.id, CURRENT_USER_ID));
+      .where(eq(schema.users.id, await getUserId()));
   }
 
   // 3. If this was a bill payment, revert bill status to unpaid

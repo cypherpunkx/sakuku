@@ -1,5 +1,6 @@
 import { db } from '../lib/db';
 import * as schema from '../lib/db/schema';
+import bcrypt from 'bcryptjs';
 
 // --- Data dari Mock Dashboard ---
 // --- Data dari Mock Dashboard ---
@@ -82,11 +83,16 @@ async function main() {
   const currentMonth = currentDay.slice(0, 7);
 
   // 1. Buat User Default
+  const hashedPassword = await bcrypt.hash('admin123', 10);
+
   const [defaultUser] = await db.insert(schema.users).values({
     id: 'user_1',
     name: 'Admin SakuKu',
     email: 'admin@sakuku.com',
+    password: hashedPassword,
     balance: TOTAL_INCOME,
+    hasOnboarding: true,
+    createdAt: new Date().toISOString(),
   }).returning();
 
   console.log('👤 User berhasil dibuat');

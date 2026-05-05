@@ -8,6 +8,7 @@ import { HealthTabContent } from "../_components/tabs/health-tab-content";
 import { BillTabContent } from "../_components/tabs/bill-tab-content";
 import { SavingsTabContent } from "../_components/tabs/savings-tab-content";
 import { AddTransactionModal } from "../_components/transaction-modal";
+import { OnboardingModal } from "../_components/onboarding-modal";
 import { 
   getSummaryData, 
   getBudgetData, 
@@ -303,6 +304,16 @@ export default async function DashboardPage({
       <Suspense fallback={null}>
         <AddModalWrapper />
       </Suspense>
+
+      <Suspense fallback={null}>
+        <OnboardingWrapper />
+      </Suspense>
     </div>
   );
+}
+
+async function OnboardingWrapper() {
+  const user = await getUser();
+  if (!user) return null;
+  return <OnboardingModal user={user} />;
 }
