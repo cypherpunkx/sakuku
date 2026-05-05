@@ -136,10 +136,12 @@ export function ExpenseTabContent({
 
   const [searchValue, setSearchValue] = useState(currentSearch);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Sync internal search state with URL when URL changes externally
   useEffect(() => {
     setSearchValue(currentSearch);
+    setIsMounted(true);
   }, [currentSearch]);
 
   const updateFilters = useCallback(
@@ -431,8 +433,8 @@ export function ExpenseTabContent({
             <CardDescription>Persentase pengeluaran.</CardDescription>
           </CardHeader>
           <CardContent className="h-[240px] min-h-[240px] flex items-center justify-center relative">
-            {dataPengeluaran.some((d) => d.value > 0) ? (
-              <ResponsiveContainer width="100%" height="100%" debounce={100}>
+            {isMounted && dataPengeluaran.some((d) => d.value > 0) ? (
+              <ResponsiveContainer width="100%" height="100%" debounce={100} minWidth={0}>
                 <PieChart>
                   <Pie
                     data={dataPengeluaran}

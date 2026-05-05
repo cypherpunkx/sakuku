@@ -1,23 +1,18 @@
 "use server";
 
+import "server-only";
 import { db } from "../db";
 import * as schema from "../db/schema";
-import { eq, and, desc, sql, SQL, gte, lte } from "drizzle-orm";
-
-import { getSession } from "../session";
-
-async function getAuthenticatedUserId() {
-  const session = await getSession();
-  if (!session?.userId) {
-    throw new Error("Unauthorized");
-  }
-  return session.userId as string;
-}
+import { eq, and, desc, sql, or, like, SQL, gte, lte } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import { verifySession } from "../dal";
 
 export async function getUser() {
-  const userId = await getAuthenticatedUserId();
+  const session = await verifySession();
+  if (!session.isAuth || !session.userId) return null;
+
   return await db.query.users.findFirst({
-    where: eq(schema.users.id, userId),
+    where: eq(schema.users.id, session.userId),
   });
 }
 
@@ -78,6 +73,15 @@ export async function getStatisticsData(monthStr?: string) {
     prevRefDate,
   );
 
+  const session = await verifySession();
+  if (!session.isAuth || !session.userId)
+    return {
+      dailyStats: [],
+      categoryStats: [],
+      targetMonth,
+      comparison: { prevIncome: 0, prevExpense: 0 },
+    };
+
   // Get daily income and expense for the target month
   const dailyStats = await db
     .select({
@@ -90,7 +94,7 @@ export async function getStatisticsData(monthStr?: string) {
       and(
         gte(schema.transactions.date, startStr),
         lte(schema.transactions.date, endStr),
-        eq(schema.transactions.userId, await getAuthenticatedUserId()),
+        eq(schema.transactions.userId, session.userId),
       ),
     )
     .groupBy(sql`strftime('%Y-%m-%d', ${schema.transactions.date})`)
@@ -107,7 +111,7 @@ export async function getStatisticsData(monthStr?: string) {
       and(
         gte(schema.transactions.date, prevStart),
         lte(schema.transactions.date, prevEnd),
-        eq(schema.transactions.userId, await getAuthenticatedUserId()),
+        eq(schema.transactions.userId, session.userId),
       ),
     );
 
@@ -128,7 +132,7 @@ export async function getStatisticsData(monthStr?: string) {
         eq(schema.transactions.type, "expense"),
         gte(schema.transactions.date, startStr),
         lte(schema.transactions.date, endStr),
-        eq(schema.transactions.userId, await getAuthenticatedUserId()),
+        eq(schema.transactions.userId, session.userId),
       ),
     )
     .groupBy(schema.categories.id);
@@ -167,9 +171,12 @@ export async function getSummaryData(range: string = "monthly") {
   }
 
   // Tambahkan filter userId
+  const session = await verifySession();
+  if (!session.isAuth || !session.userId) throw new Error("Unauthorized");
+
   const finalFilter = and(
     dateFilter,
-    eq(schema.transactions.userId, await getAuthenticatedUserId()),
+    eq(schema.transactions.userId, session.userId),
   );
 
   const [balanceResult, rangeIncomeSummary, expenseSummary] = await Promise.all(
@@ -181,7 +188,7 @@ export async function getSummaryData(range: string = "monthly") {
           expense: sql<number>`sum(case when type = 'expense' then amount else 0 end)`,
         })
         .from(schema.transactions)
-        .where(eq(schema.transactions.userId, await getAuthenticatedUserId())),
+        .where(eq(schema.transactions.userId, session.userId)),
 
       // 2. Pendapatan Periode Ini
       db
@@ -196,7 +203,7 @@ export async function getSummaryData(range: string = "monthly") {
           total: sql<number>`sum(${schema.transactions.amount})`,
         })
         .from(schema.transactions)
-        .leftJoin(
+        .innerJoin(
           schema.categories,
           eq(schema.transactions.categoryId, schema.categories.id),
         )
@@ -214,15 +221,17 @@ export async function getSummaryData(range: string = "monthly") {
   const monthlyKebutuhan = Number(
     expenseSummary.find((s) => s.priority === "Kebutuhan")?.total ?? 0,
   );
-  
+
   // Semua yang bukan kebutuhan dianggap keinginan (termasuk Lainnya atau Tanpa Kategori)
   const totalExpenses = Number(balanceResult[0]?.expense ?? 0); // Total pengeluaran (filtered by time in finalFilter? No, balanceResult is all-time)
-  
+
   // Wait, balanceResult is all time. I need monthly total expenses.
   // Let's get it from expenseSummary sum
-  const monthlyTotalExpenses = expenseSummary.reduce((acc, curr) => acc + Number(curr.total ?? 0), 0);
+  const monthlyTotalExpenses = expenseSummary.reduce(
+    (acc, curr) => acc + Number(curr.total ?? 0),
+    0,
+  );
   const monthlyKeinginan = monthlyTotalExpenses - monthlyKebutuhan;
-
 
   const currency = user?.currency || "IDR";
 
@@ -240,6 +249,9 @@ export async function getSummaryData(range: string = "monthly") {
 }
 
 export async function getBudgetData() {
+  const session = await verifySession();
+  if (!session.isAuth || !session.userId) throw new Error("Unauthorized");
+
   const user = await getUser();
   const startDay = user?.budgetStartDay || 1;
   const { startStr, endStr, periodLabel } =
@@ -264,7 +276,7 @@ export async function getBudgetData() {
       },
       where: and(
         eq(schema.budgets.period, periodLabel),
-        eq(schema.budgets.userId, await getAuthenticatedUserId()),
+        eq(schema.budgets.userId, session.userId),
       ),
     }),
   ]);
@@ -307,9 +319,12 @@ export async function getTransactionsData(
   }
 
   const categories = await db.query.categories.findMany();
+  const session = await verifySession();
+  if (!session.isAuth || !session.userId) throw new Error("Unauthorized");
+
   const filters: (SQL | undefined)[] = [
     dateFilter,
-    eq(schema.transactions.userId, await getAuthenticatedUserId()),
+    eq(schema.transactions.userId, session.userId),
   ];
 
   if (search) {
@@ -356,7 +371,7 @@ export async function getTransactionsData(
         and(
           eq(schema.transactions.type, "expense"),
           dateFilter,
-          eq(schema.transactions.userId, await getAuthenticatedUserId()),
+          eq(schema.transactions.userId, session.userId),
         ),
       )
       .groupBy(schema.categories.id),
@@ -392,15 +407,21 @@ export async function getTransactionsData(
 }
 
 export async function getBillsData() {
+  const session = await verifySession();
+  if (!session.isAuth || !session.userId) return [];
+
   return await db.query.bills.findMany({
-    where: eq(schema.bills.userId, await getAuthenticatedUserId()),
+    where: eq(schema.bills.userId, session.userId),
     orderBy: [schema.bills.dueDate],
   });
 }
 
 export async function getSavingsData() {
+  const session = await verifySession();
+  if (!session.isAuth || !session.userId) return [];
+
   return await db.query.savingsGoals.findMany({
-    where: eq(schema.savingsGoals.userId, await getAuthenticatedUserId()),
+    where: eq(schema.savingsGoals.userId, session.userId),
   });
 }
 

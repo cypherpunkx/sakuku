@@ -258,6 +258,9 @@ export function TransactionModal({
     new Date().toLocaleDateString("en-CA"),
   );
   const [loading, setLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  const DRAFT_KEY = "sakuku_tx_draft";
 
   // Category Management State
   const [isManaging, setIsManaging] = useState(false);
@@ -291,16 +294,51 @@ export function TransactionModal({
           ? new Date(transaction.date).toLocaleDateString("en-CA")
           : new Date().toLocaleDateString("en-CA"),
       );
-    } else if (!open && !transaction) {
-      // Reset for "Add" mode when closed
-      setAmount("");
-      setDescription("");
-      setStore("");
-      setDate(new Date().toLocaleDateString("en-CA"));
-      setType("expense");
-      setSelectedCategory("Makanan");
+    } else if (open && !transaction && !isInitialized) {
+      // Load draft for "Add" mode when first opening
+      try {
+        const draft = sessionStorage.getItem(DRAFT_KEY);
+        if (draft) {
+          const parsed = JSON.parse(draft);
+          setType(parsed.type || "expense");
+          setSelectedCategory(parsed.selectedCategory || "Makanan");
+          setAmount(parsed.amount || "");
+          setDescription(parsed.description || "");
+          setStore(parsed.store || "");
+          setDate(parsed.date || new Date().toLocaleDateString("en-CA"));
+          
+          toast.info("Draft transaksi dipulihkan", {
+            duration: 2000,
+          });
+        }
+      } catch (e) {
+        console.error("Failed to load draft", e);
+      }
+      setIsInitialized(true);
+    } else if (!open) {
+      // Reset initialization state when modal is closed
+      setIsInitialized(false);
     }
-  }, [transaction, open]);
+  }, [transaction, open, isInitialized]);
+
+  // Save draft whenever values change (only in Add mode)
+  useEffect(() => {
+    if (isEdit || !open) return;
+
+    const timeoutId = setTimeout(() => {
+      const draft = {
+        type,
+        selectedCategory,
+        amount,
+        description,
+        store,
+        date,
+      };
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [type, selectedCategory, amount, description, store, date, isEdit, open]);
 
   const formatNumber = (value: string) => {
     if (!value) return "";
@@ -350,6 +388,7 @@ export function TransactionModal({
         });
       } else {
         await addTransaction(data);
+        sessionStorage.removeItem(DRAFT_KEY);
         toast.success("Transaksi berhasil disimpan!", {
           description: "Data transaksi baru telah ditambahkan.",
         });

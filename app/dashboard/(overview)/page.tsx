@@ -1,27 +1,86 @@
+import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingDown, Receipt, Target, HeartPulse } from "lucide-react";
 import { BudgetInsight503020 } from "../_components/budget-insight";
 import { FinancialSummary } from "../_components/financial-summary";
-import { ExpenseTabContent } from "../_components/tabs/expense-tab-content";
-import { BudgetTabContent } from "../_components/tabs/budget-tab-content";
-import { HealthTabContent } from "../_components/tabs/health-tab-content";
-import { BillTabContent } from "../_components/tabs/bill-tab-content";
-import { SavingsTabContent } from "../_components/tabs/savings-tab-content";
-import { AddTransactionModal } from "../_components/transaction-modal";
-import { OnboardingModal } from "../_components/onboarding-modal";
-import { 
-  getSummaryData, 
-  getBudgetData, 
-  getTransactionsData, 
-  getBillsData, 
+
+// Lazy load Tab Contents to reduce initial bundle size
+const ExpenseTabContent = dynamic(
+  () =>
+    import("../_components/tabs/expense-tab-content").then(
+      (mod) => mod.ExpenseTabContent,
+    ),
+  {
+    loading: () => <TableTabSkeleton />,
+  },
+);
+
+const BudgetTabContent = dynamic(
+  () =>
+    import("../_components/tabs/budget-tab-content").then(
+      (mod) => mod.BudgetTabContent,
+    ),
+  {
+    loading: () => <CardGridTabSkeleton />,
+  },
+);
+
+const HealthTabContent = dynamic(
+  () =>
+    import("../_components/tabs/health-tab-content").then(
+      (mod) => mod.HealthTabContent,
+    ),
+  {
+    loading: () => <HealthTabSkeleton />,
+  },
+);
+
+const BillTabContent = dynamic(
+  () =>
+    import("../_components/tabs/bill-tab-content").then(
+      (mod) => mod.BillTabContent,
+    ),
+  {
+    loading: () => <CardGridTabSkeleton />,
+  },
+);
+
+const SavingsTabContent = dynamic(
+  () =>
+    import("../_components/tabs/savings-tab-content").then(
+      (mod) => mod.SavingsTabContent,
+    ),
+  {
+    loading: () => <CardGridTabSkeleton />,
+  },
+);
+
+// Lazy load AddTransactionModal as it is a large component with many dependencies
+const AddTransactionModal = dynamic(() =>
+  import("../_components/transaction-modal").then(
+    (mod) => mod.AddTransactionModal,
+  ),
+);
+import {
+  getSummaryData,
+  getBudgetData,
+  getTransactionsData,
+  getBillsData,
   getSavingsData,
-  getUser
+  getUser,
 } from "@/lib/actions";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Metadata } from "next";
 import { Suspense } from "react";
-import { SummarySkeleton, InsightSkeleton, TabsSkeleton } from "../_components/dashboard-skeletons";
+import {
+  SummarySkeleton,
+  InsightSkeleton,
+  TabsSkeleton,
+  TableTabSkeleton,
+  CardGridTabSkeleton,
+  HealthTabSkeleton,
+} from "../_components/dashboard-skeletons";
 
 export const metadata: Metadata = {
   title: "Ringkasan",
@@ -49,13 +108,16 @@ async function SummaryWrapper({ range }: { range: string }) {
 async function InsightWrapper() {
   const data = await getBudgetData();
   const summary = await getSummaryData("monthly"); // For baseline income
-  
+
   return (
     <BudgetInsight503020
       totalIncome={summary.monthlyIncome}
       needs={summary.totalKebutuhan}
       wants={summary.totalKeinginan}
-      savings={summary.monthlyIncome - (summary.monthlyKebutuhan + summary.monthlyKeinginan)}
+      savings={
+        summary.monthlyIncome -
+        (summary.monthlyKebutuhan + summary.monthlyKeinginan)
+      }
       overBudgetCategories={data.budgets
         .filter((b) => b.spent > b.amountLimit)
         .map((b) => b.category?.name || "Tanpa Kategori")}
@@ -64,26 +126,31 @@ async function InsightWrapper() {
   );
 }
 
-async function TabsWrapper({ 
-  range, tab, page, search, category 
-}: { 
-  range: string, tab: string, page: string, search: string, category: string 
+async function TabsWrapper({
+  range,
+  tab,
+  page,
+  search,
+  category,
+}: {
+  range: string;
+  tab: string;
+  page: string;
+  search: string;
+  category: string;
 }) {
   const [transactions, budgets, bills, savings, summary] = await Promise.all([
     getTransactionsData(range, parseInt(page), 10, search, category),
     getBudgetData(),
     getBillsData(),
     getSavingsData(),
-    getSummaryData(range)
+    getSummaryData(range),
   ]);
 
   const activeTab = tab === "pembelajaran" ? "target" : tab;
 
   return (
-    <Tabs
-      value={activeTab}
-      className="w-full min-h-[600px] relative"
-    >
+    <Tabs value={activeTab} className="w-full min-h-[600px] relative">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sticky top-0 z-40 bg-background/95 backdrop-blur-md py-3 px-1 border-b border-border/10 transform-gpu transition-none">
         <TabsList className="inline-flex items-center justify-start rounded-2xl bg-muted/20 p-1.5 text-muted-foreground border border-border/40 backdrop-blur-xl w-full lg:w-fit max-lg:overflow-x-auto lg:overflow-visible no-scrollbar gap-1.5 py-5">
           <TabsTrigger
@@ -136,10 +203,7 @@ async function TabsWrapper({
             asChild
             className="group inline-flex items-center justify-center whitespace-nowrap rounded-xl px-5 py-2 text-sm font-semibold transition-all data-[state=active]:bg-background data-[state=active]:text-amber-500 data-[state=active]:shadow-[0_4px_12px_rgba(245,158,11,0.2)] data-[state=active]:border-amber-500/40 border border-transparent active:scale-95 gap-2.5"
           >
-            <Link
-              href={`/dashboard?range=${range}&tab=tagihan`}
-              scroll={false}
-            >
+            <Link href={`/dashboard?range=${range}&tab=tagihan`} scroll={false}>
               <div className="size-8 rounded-lg bg-amber-500/10 flex items-center justify-center group-data-[state=active]:bg-amber-500 group-data-[state=active]:text-white transition-all duration-300">
                 <Receipt className="size-4" />
               </div>
@@ -151,10 +215,7 @@ async function TabsWrapper({
             asChild
             className="group inline-flex items-center justify-center whitespace-nowrap rounded-xl px-5 py-2 text-sm font-semibold transition-all data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-lg data-[state=active]:shadow-primary/20 data-[state=active]:border-primary/40 border border-transparent active:scale-95 gap-2.5"
           >
-            <Link
-              href={`/dashboard?range=${range}&tab=target`}
-              scroll={false}
-            >
+            <Link href={`/dashboard?range=${range}&tab=target`} scroll={false}>
               <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center group-data-[state=active]:bg-primary group-data-[state=active]:text-white transition-all duration-300">
                 <Target className="size-4" />
               </div>
@@ -176,7 +237,11 @@ async function TabsWrapper({
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {r === "daily" ? "Harian" : r === "monthly" ? "Bulanan" : "Tahunan"}
+              {r === "daily"
+                ? "Harian"
+                : r === "monthly"
+                  ? "Bulanan"
+                  : "Tahunan"}
             </Link>
           ))}
         </div>
@@ -202,7 +267,9 @@ async function TabsWrapper({
             initialBudgets={budgets.budgets}
             allCategories={budgets.categories}
             monthlyIncome={summary.monthlyIncome}
-            totalMonthlyExpenses={summary.monthlyKebutuhan + summary.monthlyKeinginan}
+            totalMonthlyExpenses={
+              summary.monthlyKebutuhan + summary.monthlyKeinginan
+            }
             currency={summary.currency}
           />
         </TabsContent>
@@ -222,7 +289,10 @@ async function TabsWrapper({
         </TabsContent>
 
         <TabsContent value="target">
-          <SavingsTabContent initialGoals={savings} currency={summary.currency} />
+          <SavingsTabContent
+            initialGoals={savings}
+            currency={summary.currency}
+          />
         </TabsContent>
       </div>
     </Tabs>
@@ -233,16 +303,26 @@ async function TabsWrapper({
 async function AddModalWrapper() {
   const [{ categories }, user] = await Promise.all([
     getTransactionsData(),
-    getUser()
+    getUser(),
   ]);
-  return <AddTransactionModal categories={categories} currency={user?.currency ?? undefined} />;
+  return (
+    <AddTransactionModal
+      categories={categories}
+      currency={user?.currency ?? undefined}
+    />
+  );
 }
 
 async function GreetingWrapper() {
   const user = await getUser();
   const userName = user?.name?.split(" ")[0] || "Teman";
   const hours = new Date().getHours();
-  const greeting = hours < 12 ? "Selamat Pagi" : hours < 17 ? "Selamat Siang" : "Selamat Malam";
+  const greeting =
+    hours < 12
+      ? "Selamat Pagi"
+      : hours < 17
+        ? "Selamat Siang"
+        : "Selamat Malam";
 
   return (
     <div className="flex flex-col gap-2">
@@ -277,7 +357,11 @@ export default async function DashboardPage({
 
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto w-full pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <Suspense fallback={<div className="h-20 w-64 bg-muted/10 animate-pulse rounded-xl" />}>
+      <Suspense
+        fallback={
+          <div className="h-20 w-64 bg-muted/10 animate-pulse rounded-xl" />
+        }
+      >
         <GreetingWrapper />
       </Suspense>
 
@@ -291,12 +375,12 @@ export default async function DashboardPage({
 
       <section className="flex flex-col gap-6">
         <Suspense fallback={<TabsSkeleton />}>
-          <TabsWrapper 
-            range={range} 
-            tab={tab} 
-            page={page} 
-            search={search} 
-            category={category} 
+          <TabsWrapper
+            range={range}
+            tab={tab}
+            page={page}
+            search={search}
+            category={category}
           />
         </Suspense>
       </section>

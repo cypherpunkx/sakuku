@@ -51,27 +51,83 @@ export function TabsSkeleton() {
         <Skeleton className="h-10 w-32 rounded-xl" />
         <Skeleton className="h-10 w-32 rounded-xl" />
       </div>
+      <TableTabSkeleton />
+    </div>
+  );
+}
+
+export function TableTabSkeleton() {
+  return (
+    <div className="grid gap-6 md:grid-cols-3 animate-in fade-in duration-500">
+      <Card className="md:col-span-2 border-border/40 bg-card/30 backdrop-blur-md">
+        <CardHeader>
+          <Skeleton className="h-6 w-48 mb-2" />
+          <Skeleton className="h-4 w-64" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-xl" />
+          ))}
+        </CardContent>
+      </Card>
+      <Card className="border-border/40 bg-card/30 backdrop-blur-md">
+        <CardHeader>
+          <Skeleton className="h-6 w-32 mb-2" />
+          <Skeleton className="h-4 w-48" />
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-64">
+          <Skeleton className="h-48 w-48 rounded-full" />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export function CardGridTabSkeleton() {
+  return (
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 animate-in fade-in duration-500">
+      {[...Array(6)].map((_, i) => (
+        <Card key={i} className="border-border/40 bg-card/30 backdrop-blur-md">
+          <CardHeader className="pb-2">
+            <Skeleton className="h-4 w-24 mb-2" />
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-2 w-full rounded-full" />
+            <div className="flex justify-between">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+export function HealthTabSkeleton() {
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <Card className="border-primary/20 bg-primary/5 backdrop-blur-md">
+        <CardContent className="p-8">
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            <Skeleton className="size-48 rounded-full shrink-0" />
+            <div className="space-y-4 flex-1 w-full">
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <div className="grid grid-cols-2 gap-4 pt-4">
+                <Skeleton className="h-20 w-full rounded-2xl" />
+                <Skeleton className="h-20 w-full rounded-2xl" />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="md:col-span-2 border-border/40 bg-card/30">
-          <CardHeader>
-            <Skeleton className="h-6 w-48 mb-2" />
-            <Skeleton className="h-4 w-64" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full rounded-xl" />
-            ))}
-          </CardContent>
-        </Card>
-        <Card className="border-border/40 bg-card/30">
-          <CardHeader>
-            <Skeleton className="h-6 w-32 mb-2" />
-            <Skeleton className="h-4 w-48" />
-          </CardHeader>
-          <CardContent className="flex items-center justify-center h-64">
-            <Skeleton className="h-48 w-48 rounded-full" />
-          </CardContent>
-        </Card>
+        {[...Array(3)].map((_, i) => (
+          <Skeleton key={i} className="h-32 w-full rounded-2xl" />
+        ))}
       </div>
     </div>
   );
