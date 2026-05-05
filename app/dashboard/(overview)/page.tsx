@@ -80,7 +80,7 @@ async function TabsWrapper({
 
   return (
     <Tabs
-      defaultValue={activeTab}
+      value={activeTab}
       className="w-full min-h-[600px] relative"
     >
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sticky top-0 z-40 bg-background/95 backdrop-blur-md py-3 px-1 border-b border-border/10 transform-gpu transition-none">
