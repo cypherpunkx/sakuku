@@ -189,6 +189,44 @@ const getCategoryIcon = (cat: any) => {
   return cat.type === "income" ? ICON_MAP["Wallet"] : ICON_MAP["Plus"];
 };
 
+// Helper to get the actual color for style or class
+const getCategoryColor = (cat: any, isSelected: boolean) => {
+  const defaultColor = cat.type === "income" ? "#10b981" : "#f43f5e";
+  const color = cat.color || defaultColor;
+  
+  if (color.startsWith("#")) {
+    return { 
+      style: { color: isSelected ? color : `${color}90` }, 
+      className: "" 
+    };
+  }
+  
+  return { 
+    style: {}, 
+    className: isSelected ? color : "text-muted-foreground/70" 
+  };
+};
+
+const getCategoryBg = (cat: any, isSelected: boolean) => {
+  const defaultColor = cat.type === "income" ? "#10b981" : "#f43f5e";
+  const color = cat.color || defaultColor;
+  
+  if (color.startsWith("#")) {
+    return { 
+      style: { 
+        backgroundColor: isSelected ? `${color}25` : `${color}10`,
+        borderColor: isSelected ? `${color}50` : `${color}20` 
+      } 
+    };
+  }
+  
+  return { 
+    className: isSelected 
+      ? "bg-primary/20 border-primary/40 shadow-primary/10" 
+      : "bg-muted/5 border-transparent hover:border-white/5" 
+  };
+};
+
 interface TransactionModalProps {
   transaction?: any;
   categories?: any[];
@@ -277,7 +315,13 @@ export function TransactionModal({
 
   const handleTypeChange = (newType: "expense" | "income") => {
     setType(newType);
-    setSelectedCategory(newType === "expense" ? "Makanan" : "Gaji");
+    // Cari kategori pertama yang tersedia untuk tipe tersebut
+    const available = dbCategories.filter((c) => c.type === newType);
+    if (available.length > 0) {
+      setSelectedCategory(available[0].name);
+    } else {
+      setSelectedCategory(newType === "expense" ? "Makanan" : "Gaji");
+    }
   };
 
   const handleSave = async () => {
@@ -343,9 +387,11 @@ export function TransactionModal({
           color:
             type === "expense"
               ? newCatPriority === "Kebutuhan"
-                ? "text-rose-500"
-                : "text-amber-500"
-              : "text-emerald-500",
+                ? "#f43f5e"
+                : newCatPriority === "Keinginan"
+                  ? "#f59e0b"
+                  : "#10b981"
+              : "#10b981",
           icon: newCatIcon,
         });
         toast.success("Kategori baru berhasil ditambahkan!");
@@ -660,6 +706,7 @@ export function TransactionModal({
                         Kebutuhan
                       </button>
                       <button
+                        type="button"
                         onClick={() => setNewCatPriority("Keinginan")}
                         aria-pressed={newCatPriority === "Keinginan"}
                         className={cn(
@@ -719,21 +766,16 @@ export function TransactionModal({
                                   <div
                                     className={cn(
                                       "size-10 rounded-2xl flex items-center justify-center border transition-all duration-300 group-hover:scale-110 group-active:scale-95 shadow-lg",
-                                      selectedCategory === cat.name
-                                        ? cn(
-                                            "border-primary/50 shadow-primary/20",
-                                            bg,
-                                          )
-                                        : "bg-muted/10 border-transparent hover:border-white/10",
+                                      getCategoryBg(cat, selectedCategory === cat.name).className
                                     )}
+                                    style={getCategoryBg(cat, selectedCategory === cat.name).style}
                                   >
                                     <Icon
                                       className={cn(
                                         "size-4 transition-transform group-hover:scale-110",
-                                        selectedCategory === cat.name
-                                          ? cat.color
-                                          : "text-muted-foreground/90",
+                                        getCategoryColor(cat, selectedCategory === cat.name).className
                                       )}
+                                      style={getCategoryColor(cat, selectedCategory === cat.name).style}
                                     />
                                   </div>
                                   <span
@@ -743,7 +785,7 @@ export function TransactionModal({
                                         ? "opacity-100"
                                         : "text-muted-foreground",
                                     )}
-                                    style={{ color: selectedCategory === cat.name ? cat.color : undefined }}
+                                    style={getCategoryColor(cat, selectedCategory === cat.name).style}
                                   >
                                     {cat.name}
                                   </span>
@@ -798,21 +840,16 @@ export function TransactionModal({
                                   <div
                                     className={cn(
                                       "size-10 rounded-2xl flex items-center justify-center border transition-all duration-300 group-hover:scale-110 group-active:scale-95 shadow-lg",
-                                      selectedCategory === cat.name
-                                        ? cn(
-                                            "border-primary/50 shadow-primary/20",
-                                            bg,
-                                          )
-                                        : "bg-muted/10 border-transparent hover:border-white/10",
+                                      getCategoryBg(cat, selectedCategory === cat.name).className
                                     )}
+                                    style={getCategoryBg(cat, selectedCategory === cat.name).style}
                                   >
                                     <Icon
                                       className={cn(
                                         "size-4 transition-transform group-hover:scale-110",
-                                        selectedCategory === cat.name
-                                          ? cat.color
-                                          : "text-muted-foreground/90",
+                                        getCategoryColor(cat, selectedCategory === cat.name).className
                                       )}
+                                      style={getCategoryColor(cat, selectedCategory === cat.name).style}
                                     />
                                   </div>
                                   <span
@@ -822,7 +859,7 @@ export function TransactionModal({
                                         ? "opacity-100"
                                         : "text-muted-foreground",
                                     )}
-                                    style={{ color: selectedCategory === cat.name ? cat.color : undefined }}
+                                    style={getCategoryColor(cat, selectedCategory === cat.name).style}
                                   >
                                     {cat.name}
                                   </span>
@@ -868,33 +905,29 @@ export function TransactionModal({
                               onClick={() => setSelectedCategory(cat.name)}
                               className="flex flex-col items-center gap-2 group transition-all w-full"
                             >
-                              <div
-                                className={cn(
-                                  "size-10 rounded-2xl flex items-center justify-center border transition-all duration-300 group-hover:scale-110 group-active:scale-95 shadow-lg",
-                                  selectedCategory === cat.name
-                                    ? cn(
-                                        "border-primary/50 shadow-primary/20",
-                                        bg,
-                                      )
-                                    : "bg-muted/10 border-transparent hover:border-white/10",
-                                )}
-                              >
+                                <div
+                                  className={cn(
+                                    "size-10 rounded-2xl flex items-center justify-center border transition-all duration-300 group-hover:scale-110 group-active:scale-95 shadow-lg",
+                                    getCategoryBg(cat, selectedCategory === cat.name).className
+                                  )}
+                                  style={getCategoryBg(cat, selectedCategory === cat.name).style}
+                                >
                                 <Icon
                                   className={cn(
                                     "size-4 transition-transform group-hover:scale-110",
-                                    selectedCategory === cat.name
-                                      ? cat.color
-                                      : "text-muted-foreground/90",
+                                    getCategoryColor(cat, selectedCategory === cat.name).className
                                   )}
+                                  style={getCategoryColor(cat, selectedCategory === cat.name).style}
                                 />
                               </div>
                               <span
                                 className={cn(
-                                  "text-[10px] font-bold truncate w-full text-center px-1",
+                                  "text-[10px] font-bold truncate w-full text-center px-1 transition-colors",
                                   selectedCategory === cat.name
-                                    ? "text-foreground"
+                                    ? "opacity-100"
                                     : "text-muted-foreground",
                                 )}
+                                style={getCategoryColor(cat, selectedCategory === cat.name).style}
                               >
                                 {cat.name}
                               </span>

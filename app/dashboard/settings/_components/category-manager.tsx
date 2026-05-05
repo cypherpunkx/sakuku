@@ -18,8 +18,6 @@ import {
   Wallet,
   CreditCard,
   PiggyBank,
-  Check,
-  X,
   PlusCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -104,7 +102,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
     type: "expense" as "expense" | "income",
     color: "#ef4444",
     icon: "ShoppingBag",
-    priority: "Lainnya" as "Kebutuhan" | "Keinginan" | "Tabungan" | "Lainnya",
+    priority: "Kebutuhan" as "Kebutuhan" | "Keinginan",
   });
 
   const filteredCategories = categories.filter(
@@ -119,7 +117,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
       type: activeTab,
       color: activeTab === "expense" ? "#ef4444" : "#10b981",
       icon: "ShoppingBag",
-      priority: "Lainnya",
+      priority: "Kebutuhan",
     });
     setEditingCategory(null);
   };
@@ -173,7 +171,9 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
       type: cat.type,
       color: cat.color || "#ef4444",
       icon: cat.icon || "ShoppingBag",
-      priority: cat.priority || "Lainnya",
+      priority: ["Kebutuhan", "Keinginan"].includes(cat.priority)
+        ? cat.priority
+        : "Kebutuhan",
     });
     setIsDialogOpen(true);
   };
@@ -195,7 +195,14 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
           }}
         >
           <DialogTrigger asChild>
-            <Button className="bg-gradient-premium text-primary-foreground font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-105 transition-all">
+            <Button
+              className={cn(
+                "font-bold rounded-xl shadow-lg transition-all hover:scale-105",
+                activeTab === "expense"
+                  ? "bg-linear-to-r from-rose-600 to-rose-500 text-white shadow-rose-500/20"
+                  : "bg-linear-to-r from-emerald-600 to-emerald-500 text-white shadow-emerald-500/20",
+              )}
+            >
               <PlusCircle className="size-4 mr-2" />
               Tambah
             </Button>
@@ -237,11 +244,17 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                         }
                         aria-label={`Pilih ikon ${iconName}`}
                         className={cn(
-                          "size-10 rounded-lg flex items-center justify-center transition-all",
+                          "size-10 rounded-xl flex items-center justify-center transition-all duration-300",
                           formData.icon === iconName
-                            ? "bg-primary text-primary-foreground shadow-lg scale-110"
-                            : "hover:bg-primary/10 text-muted-foreground",
+                            ? "text-white shadow-lg scale-110 ring-2 ring-white/20"
+                            : "hover:bg-white/5 text-muted-foreground",
                         )}
+                        style={{
+                          backgroundColor:
+                            formData.icon === iconName
+                              ? formData.color
+                              : undefined,
+                        }}
                       >
                         <Icon className="size-5" />
                       </button>
@@ -270,50 +283,46 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                 </div>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="cat-priority">
-                  Alokasi Anggaran (50/30/20)
-                </Label>
-                <Select
-                  value={formData.priority}
-                  onValueChange={(val: any) =>
-                    setFormData((p) => ({ ...p, priority: val }))
-                  }
-                >
-                  <SelectTrigger
-                    id="cat-priority"
-                    className="h-11 bg-background/50 border-border/40 rounded-xl"
+              {formData.type === "expense" && (
+                <div className="grid gap-2">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider pl-1">
+                    Alokasi Anggaran (50/30)
+                  </Label>
+                  <Select
+                    value={formData.priority}
+                    onValueChange={(val: any) =>
+                      setFormData((p) => ({ ...p, priority: val }))
+                    }
                   >
-                    <SelectValue placeholder="Pilih Alokasi" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40 rounded-xl">
-                    <SelectItem
-                      value="Kebutuhan"
-                      className="focus:bg-primary/10 rounded-lg"
+                    <SelectTrigger
+                      id="cat-priority"
+                      className="w-full h-12 bg-background/40 border-white/10 rounded-2xl hover:bg-white/5 transition-all focus:ring-1 focus:ring-primary/50 px-4 text-sm"
                     >
-                      Kebutuhan (50%)
-                    </SelectItem>
-                    <SelectItem
-                      value="Keinginan"
-                      className="focus:bg-primary/10 rounded-lg"
-                    >
-                      Keinginan (30%)
-                    </SelectItem>
-                    <SelectItem
-                      value="Tabungan"
-                      className="focus:bg-primary/10 rounded-lg"
-                    >
-                      Tabungan & Investasi (20%)
-                    </SelectItem>
-                    <SelectItem
-                      value="Lainnya"
-                      className="focus:bg-primary/10 rounded-lg"
-                    >
-                      Lainnya
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                      <SelectValue placeholder="Pilih Alokasi" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background/60 backdrop-blur-3xl border-white/10 rounded-2xl p-1 shadow-2xl">
+                      <SelectItem
+                        value="Kebutuhan"
+                        className="rounded-xl focus:bg-rose-500/10 focus:text-rose-500 font-bold transition-colors cursor-pointer py-3"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="size-2 rounded-full bg-rose-500" />
+                          <span>Kebutuhan (50%)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem
+                        value="Keinginan"
+                        className="rounded-xl focus:bg-amber-500/10 focus:text-amber-500 font-bold transition-colors cursor-pointer py-3"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="size-2 rounded-full bg-amber-500" />
+                          <span>Keinginan (30%)</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <DialogFooter>
@@ -326,7 +335,12 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
               </Button>
               <Button
                 onClick={handleSave}
-                className="bg-gradient-premium text-primary-foreground font-bold rounded-xl px-8"
+                className={cn(
+                  "font-bold rounded-xl px-8 transition-all",
+                  formData.type === "expense"
+                    ? "bg-linear-to-r from-rose-600 to-rose-500 text-white shadow-rose-500/20"
+                    : "bg-linear-to-r from-emerald-600 to-emerald-500 text-white shadow-emerald-500/20",
+                )}
               >
                 {editingCategory ? "Simpan Perubahan" : "Simpan Kategori"}
               </Button>
@@ -345,29 +359,51 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
           }}
         >
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
-            <TabsList className="bg-background/50 border border-border/40 p-1 rounded-xl w-full sm:w-auto">
+            <TabsList className="bg-muted/20 border border-white/5 p-1 rounded-xl w-full sm:w-auto">
               <TabsTrigger
                 value="expense"
-                className="rounded-lg font-bold data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+                className={cn(
+                  "rounded-lg font-bold transition-all border border-transparent px-6 py-2",
+                  activeTab === "expense"
+                    ? "bg-background text-rose-500! shadow-2xl border-white/5"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
               >
                 Pengeluaran
               </TabsTrigger>
               <TabsTrigger
                 value="income"
-                className="rounded-lg font-bold data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+                className={cn(
+                  "rounded-lg font-bold transition-all border border-transparent px-6 py-2",
+                  activeTab === "income"
+                    ? "bg-background text-emerald-500! shadow-2xl border-white/5"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
               >
                 Pemasukan
               </TabsTrigger>
             </TabsList>
 
             <div className="relative flex-1 group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+              <Search
+                className={cn(
+                  "absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground transition-colors",
+                  activeTab === "expense"
+                    ? "group-focus-within:text-rose-500"
+                    : "group-focus-within:text-emerald-500",
+                )}
+              />
               <Input
                 placeholder="Cari kategori..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 aria-label="Cari kategori transaksi"
-                className="pl-10 bg-background/50 border-border/40 rounded-xl focus:border-primary/50"
+                className={cn(
+                  "pl-10 bg-background/50 border-border/40 rounded-xl transition-all",
+                  activeTab === "expense"
+                    ? "focus:border-rose-500/50 focus:ring-rose-500/10"
+                    : "focus:border-emerald-500/50 focus:ring-emerald-500/10",
+                )}
               />
             </div>
           </div>

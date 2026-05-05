@@ -317,16 +317,18 @@ export async function getTransactionsData(
   const totalTransactions = totalCountResult[0].count;
   const totalPages = Math.ceil(totalTransactions / pageSize);
 
-  const dataPengeluaran = categories.map(cat => {
-    const summary = categorySummary.find(s => s.id === cat.id);
-    return {
-      id: cat.id,
-      name: cat.name,
-      value: Number(summary?.value || 0),
-      color: cat.color,
-      priority: cat.priority
-    };
-  });
+  const dataPengeluaran = categories
+    .filter((cat) => cat.type === "expense")
+    .map((cat) => {
+      const summary = categorySummary.find((s) => s.id === cat.id);
+      return {
+        id: cat.id,
+        name: cat.name,
+        value: Number(summary?.value || 0),
+        color: cat.color,
+        priority: cat.priority,
+      };
+    });
 
   return {
     transactions,

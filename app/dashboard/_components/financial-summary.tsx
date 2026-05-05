@@ -6,7 +6,7 @@ import {
   TrendingDown,
   PieChart,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 interface FinancialSummaryProps {
   currentBalance: number;
@@ -63,6 +63,10 @@ export function FinancialSummary({
             : `Posisi ${currentMonthLabel}`,
       icon: Wallet,
       color: currentBalance > 0 ? "text-emerald-500" : "text-rose-500",
+      valueColor: "text-primary",
+      accentColor: "from-primary to-purple-500",
+      glowColor: "bg-primary/10",
+      hoverBorder: "hover:border-primary/50",
       trend: currentBalance > 0 ? "up" : "down",
     },
     {
@@ -92,6 +96,10 @@ export function FinancialSummary({
           : usagePercentageRange <= 95
             ? "text-amber-500"
             : "text-rose-500",
+      valueColor: "text-rose-500",
+      accentColor: "from-rose-500 to-rose-600",
+      glowColor: "bg-rose-500/10",
+      hoverBorder: "hover:border-rose-500/50",
       trend:
         totalPengeluaranRange === 0 || (usagePercentageRange < 85 && monthlyIncome > 0)
           ? "safe"
@@ -114,7 +122,11 @@ export function FinancialSummary({
             ? `Akumulasi tahun ${today.getFullYear()}`
             : `Arus kas ${currentMonthLabel.split(" ")[0]}`,
       icon: PieChart,
-      color: sisaAnggaran > 0 ? "text-primary" : "text-rose-500",
+      color: sisaAnggaran > 0 ? "text-emerald-500" : "text-rose-500",
+      valueColor: sisaAnggaran >= 0 ? "text-emerald-500" : "text-rose-500",
+      accentColor: sisaAnggaran >= 0 ? "from-emerald-500 to-emerald-600" : "from-rose-500 to-rose-600",
+      glowColor: sisaAnggaran >= 0 ? "bg-emerald-500/10" : "bg-rose-500/10",
+      hoverBorder: sisaAnggaran >= 0 ? "hover:border-emerald-500/50" : "hover:border-rose-500/50",
       trend:
         sisaAnggaran > 0 || (monthlyIncome === 0 && sisaAnggaran === 0)
           ? "safe"
@@ -144,11 +156,14 @@ export function FinancialSummary({
         return (
           <Card
             key={item.title}
-            className="border-border/40 bg-card/30 backdrop-blur-md shadow-xl overflow-hidden group relative transition-all duration-500 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 cursor-default"
+            className={cn(
+              "border-border/40 bg-card/30 backdrop-blur-md shadow-xl overflow-hidden group relative transition-all duration-500 hover:shadow-2xl cursor-default",
+              item.hoverBorder
+            )}
             style={{ transform: "translateZ(0)" }}
           >
             {/* Animated Background Glow */}
-            <div className="absolute -right-8 -top-8 size-24 bg-primary/10 blur-3xl group-hover:bg-primary/20 transition-colors duration-500 rounded-full" />
+            <div className={cn("absolute -right-8 -top-8 size-24 blur-3xl transition-colors duration-500 rounded-full", item.glowColor)} />
             <div className="absolute inset-0 bg-linear-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
 
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
@@ -163,7 +178,7 @@ export function FinancialSummary({
               </div>
             </CardHeader>
             <CardContent className="relative z-10 pt-2">
-              <div className="text-2xl font-black tracking-tight text-gradient-primary">
+              <div className={cn("text-2xl font-black tracking-tight", item.valueColor)}>
                 {item.value}
               </div>
               <div className="flex items-center gap-2 mt-2">
@@ -187,7 +202,7 @@ export function FinancialSummary({
             </CardContent>
 
             {/* Bottom Accent Line */}
-            <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-linear-to-r from-primary to-accent transition-all duration-700 group-hover:w-full" />
+            <div className={cn("absolute bottom-0 left-0 h-[2px] w-0 bg-linear-to-r transition-all duration-700 group-hover:w-full", item.accentColor)} />
           </Card>
         );
       })}

@@ -163,9 +163,9 @@ async function main() {
 
   // 6. Savings Goals
   const SAVINGS_GOALS = [
-    { name: 'Dana Darurat', targetAmount: 50000000, currentAmount: 25000000, iconName: 'ShieldCheck', color: '#10b981' },
-    { name: 'Liburan Jepang', targetAmount: 15000000, currentAmount: 2500000, iconName: 'Plane', color: '#3b82f6' },
-    { name: 'Laptop Baru', targetAmount: 25000000, currentAmount: 12000000, iconName: 'Laptop', color: '#8b5cf6' },
+    { name: 'Dana Darurat', targetAmount: 50000000, currentAmount: 25000000, iconName: 'ShieldCheck', color: '#10b981', dueDate: '2026-12-31' },
+    { name: 'Liburan Jepang', targetAmount: 15000000, currentAmount: 2500000, iconName: 'Plane', color: '#3b82f6', dueDate: '2026-06-15' },
+    { name: 'Laptop Baru', targetAmount: 25000000, currentAmount: 12000000, iconName: 'Laptop', color: '#8b5cf6', dueDate: '2026-09-01' },
   ];
 
   for (const goal of SAVINGS_GOALS) {

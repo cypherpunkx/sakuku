@@ -25,8 +25,6 @@ import {
 export const PRIORITY_OPTIONS = [
   "Kebutuhan",
   "Keinginan",
-  "Tabungan",
-  "Lainnya",
 ] as const;
 
 export type PriorityType = (typeof PRIORITY_OPTIONS)[number];

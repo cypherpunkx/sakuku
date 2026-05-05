@@ -170,35 +170,40 @@ export function ExpenseTabContent({
 
   const handleGeneratePlan = async () => {
     setIsGeneratingPlan(true);
-    const toastId = toast.loading("AI sedang menganalisis pola pengeluaran & pendapatan...");
+    const toastId = toast.loading(
+      "AI sedang menganalisis pola pengeluaran & pendapatan...",
+    );
 
     try {
       // 1. Simulasi analisis AI (memberikan kesan 'berpikir' yang lebih premium)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // 2. Persiapan Data & Algoritma 50/30/20
       const income = monthlyIncome || 3000000; // Fallback ke standar UMR jika data 0
       const targetNeeds = income * 0.5;
       const targetWants = income * 0.3;
-      
+
       const currentNeedsTotal = dataPengeluaran
-        .filter(i => i.priority === "Kebutuhan")
+        .filter((i) => i.priority === "Kebutuhan")
         .reduce((acc, curr) => acc + curr.value, 0);
-      
+
       const currentWantsTotal = dataPengeluaran
-        .filter(i => i.priority === "Keinginan")
+        .filter((i) => i.priority === "Keinginan")
         .reduce((acc, curr) => acc + curr.value, 0);
 
       // 3. Kalkulasi Budget per Kategori
       const promises = dataPengeluaran.map(async (item) => {
         let suggestedBudget = item.value;
-        
+
         if (item.priority === "Kebutuhan") {
           // Target Ideal: 50%
           const needsRatio = currentNeedsTotal / income;
           const factor = needsRatio > 0.5 ? 0.95 : 1.1;
-          suggestedBudget = item.value > 0 ? item.value * factor : (income * 0.1);
-        } else if (item.priority === "Keinginan" || item.priority === "Lainnya") {
+          suggestedBudget = item.value > 0 ? item.value * factor : income * 0.1;
+        } else if (
+          item.priority === "Keinginan" ||
+          item.priority === "Lainnya"
+        ) {
           // Target Ideal: 30%
           const wantsRatio = currentWantsTotal / income;
           const factor = wantsRatio > 0.3 ? 0.75 : 0.85;
@@ -206,14 +211,19 @@ export function ExpenseTabContent({
         } else if (item.priority === "Tabungan") {
           // Target Ideal: 20%
           // Jika tabungan saat ini rendah, paksa alokasi ke 20% / jumlah kategori tabungan
-          const savingsCount = dataPengeluaran.filter(i => i.priority === "Tabungan").length || 1;
+          const savingsCount =
+            dataPengeluaran.filter((i) => i.priority === "Tabungan").length ||
+            1;
           const idealSavingsPerCat = (income * 0.2) / savingsCount;
-          suggestedBudget = item.value < idealSavingsPerCat ? idealSavingsPerCat : item.value * 1.1;
+          suggestedBudget =
+            item.value < idealSavingsPerCat
+              ? idealSavingsPerCat
+              : item.value * 1.1;
         }
 
         // Round to nearest 25.000 untuk presisi yang lebih humanis
         suggestedBudget = Math.round(suggestedBudget / 25000) * 25000;
-        
+
         // Pastikan tidak nol jika itu kebutuhan penting
         if (item.priority === "Kebutuhan" && suggestedBudget === 0) {
           suggestedBudget = 100000;
@@ -228,12 +238,15 @@ export function ExpenseTabContent({
 
       toast.success("Rencana Hemat AI Siap!", {
         id: toastId,
-        description: "Anggaran telah dioptimalkan berdasarkan prinsip 50/30/20.",
+        description:
+          "Anggaran telah dioptimalkan berdasarkan prinsip 50/30/20.",
       });
 
       // 4. Navigasi ke tab anggaran untuk review
       startTransition(() => {
-        router.push(`/dashboard?range=${currentRange}&tab=anggaran`, { scroll: false });
+        router.push(`/dashboard?range=${currentRange}&tab=anggaran`, {
+          scroll: false,
+        });
       });
     } catch (error) {
       toast.error("Gagal menjalankan algoritma AI", { id: toastId });
@@ -740,12 +753,12 @@ export function ExpenseTabContent({
                       const params = new URLSearchParams(
                         searchParams.toString(),
                       );
-                        params.set(
-                          "page",
-                          (pagination.currentPage - 1).toString(),
-                        );
-                        router.push(`?${params.toString()}`, { scroll: false });
-                      }}
+                      params.set(
+                        "page",
+                        (pagination.currentPage - 1).toString(),
+                      );
+                      router.push(`?${params.toString()}`, { scroll: false });
+                    }}
                     className="h-8 w-8 p-0 rounded-lg border-white/10 bg-transparent hover:bg-white/5 disabled:opacity-30"
                     aria-label="Halaman Sebelumnya"
                   >
@@ -759,12 +772,12 @@ export function ExpenseTabContent({
                       const params = new URLSearchParams(
                         searchParams.toString(),
                       );
-                        params.set(
-                          "page",
-                          (pagination.currentPage + 1).toString(),
-                        );
-                        router.push(`?${params.toString()}`, { scroll: false });
-                      }}
+                      params.set(
+                        "page",
+                        (pagination.currentPage + 1).toString(),
+                      );
+                      router.push(`?${params.toString()}`, { scroll: false });
+                    }}
                     className="h-8 w-8 p-0 rounded-lg border-white/10 bg-transparent hover:bg-white/5 disabled:opacity-30"
                     aria-label="Halaman Berikutnya"
                   >
@@ -840,9 +853,9 @@ export function ExpenseTabContent({
                   const income = monthlyIncome || 3000000;
                   const idealWants = income * 0.3;
                   const overspent = totalKeinginan - idealWants;
-                  
+
                   const topWants = [...dataPengeluaran]
-                    .filter(i => i.priority === "Keinginan")
+                    .filter((i) => i.priority === "Keinginan")
                     .sort((a, b) => b.value - a.value)[0];
 
                   return (
@@ -855,14 +868,38 @@ export function ExpenseTabContent({
                         <p className="text-xs text-muted-foreground leading-relaxed">
                           {overspent > 0 ? (
                             <>
-                              Pengeluaran <span className="text-rose-500 font-bold">Keinginan</span> Anda sudah melebihi batas ideal sebesar <span className="text-foreground font-bold">Rp {overspent.toLocaleString("id-ID")}</span>. 
+                              Pengeluaran{" "}
+                              <span className="text-rose-500 font-bold">
+                                Keinginan
+                              </span>{" "}
+                              Anda sudah melebihi batas ideal sebesar{" "}
+                              <span className="text-foreground font-bold">
+                                Rp {overspent.toLocaleString("id-ID")}
+                              </span>
+                              .
                               {topWants && (
-                                <span> Alokasi terbesar ada pada kategori <span className="text-primary font-bold">{topWants.name}</span>.</span>
+                                <span>
+                                  {" "}
+                                  Alokasi terbesar ada pada kategori{" "}
+                                  <span className="text-primary font-bold">
+                                    {topWants.name}
+                                  </span>
+                                  .
+                                </span>
                               )}
                             </>
                           ) : (
                             <>
-                              Bagus! Pengeluaran <span className="text-emerald-500 font-bold">Keinginan</span> Anda masih di bawah batas ideal 30%. Anda memiliki sisa ruang <span className="text-foreground font-bold">Rp {Math.abs(overspent).toLocaleString("id-ID")}</span> untuk ditabung.
+                              Bagus! Pengeluaran{" "}
+                              <span className="text-emerald-500 font-bold">
+                                Keinginan
+                              </span>{" "}
+                              Anda masih di bawah batas ideal 30%. Anda memiliki
+                              sisa ruang{" "}
+                              <span className="text-foreground font-bold">
+                                Rp {Math.abs(overspent).toLocaleString("id-ID")}
+                              </span>{" "}
+                              untuk ditabung.
                             </>
                           )}
                         </p>
@@ -872,10 +909,9 @@ export function ExpenseTabContent({
                           Strategi AI
                         </p>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                          {overspent > 0 
-                            ? `Gunakan "Rencana Hemat" untuk memangkas pengeluaran non-esensial secara otomatis agar dana darurat Anda tetap terjaga.` 
-                            : `Pertahankan pola ini dan alokasikan sisa dana ke instrumen investasi untuk pertumbuhan aset jangka panjang.`
-                          }
+                          {overspent > 0
+                            ? `Gunakan "Rencana Hemat" untuk memangkas pengeluaran non-esensial secara otomatis agar dana darurat Anda tetap terjaga.`
+                            : `Pertahankan pola ini dan alokasikan sisa dana ke instrumen investasi untuk pertumbuhan aset jangka panjang.`}
                         </p>
                       </div>
                     </>
@@ -902,7 +938,11 @@ export function ExpenseTabContent({
               onClick={handleGeneratePlan}
               disabled={isGeneratingPlan}
             >
-              {isGeneratingPlan ? "Menganalisis..." : (totalKeinginan > 0 ? "Buat Rencana Hemat" : "Atur Target Baru")}
+              {isGeneratingPlan
+                ? "Menganalisis..."
+                : totalKeinginan > 0
+                  ? "Buat Rencana Hemat"
+                  : "Atur Target Baru"}
               {!isGeneratingPlan && <ArrowRight className="ml-2 size-4" />}
             </Button>
           </CardContent>

@@ -38,6 +38,8 @@ import {
   updateSavingGoal,
 } from "@/lib/actions";
 import { toast } from "sonner";
+import { format, differenceInDays, isAfter, startOfToday } from "date-fns";
+import { id } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
 import {
   InputGroup,
@@ -62,7 +64,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Pencil } from "lucide-react";
+import { MoreVertical, Pencil, Calendar as CalendarIcon } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -141,6 +144,7 @@ export function SavingsTabContent({
   const [newName, setNewName] = useState("");
   const [newTarget, setNewTarget] = useState("");
   const [newIcon, setNewIcon] = useState("Target");
+  const [newDueDate, setNewDueDate] = useState<string>("");
 
   const handleAddGoal = async () => {
     if (!newName || !newTarget) return;
@@ -151,6 +155,7 @@ export function SavingsTabContent({
           targetAmount: parseInt(newTarget.replace(/\./g, "")),
           iconName: newIcon,
           color: "#10b981",
+          dueDate: newDueDate || null,
         });
         toast.success("Target tabungan berhasil dibuat!", {
           description: "Mari mulai menabung untuk impianmu.",
@@ -171,6 +176,7 @@ export function SavingsTabContent({
           name: newName,
           targetAmount: parseInt(newTarget.replace(/\./g, "")),
           iconName: newIcon,
+          dueDate: newDueDate || null,
         });
         toast.success("Target berhasil diperbarui!");
         setIsEditOpen(false);
@@ -185,6 +191,7 @@ export function SavingsTabContent({
     setNewName("");
     setNewTarget("");
     setNewIcon("Target");
+    setNewDueDate("");
     setSelectedGoal(null);
   };
 
@@ -336,9 +343,21 @@ export function SavingsTabContent({
               Tetapkan target dan disiplin menabung setiap hari.
             </p>
           </div>
-          <Sheet open={isAddOpen} onOpenChange={setIsAddOpen}>
+          <Sheet 
+            open={isAddOpen} 
+            onOpenChange={(open) => {
+              setIsAddOpen(open);
+              if (!open) resetForm();
+            }}
+          >
             <SheetTrigger asChild>
-              <Button className="w-full rounded-2xl bg-primary hover:bg-primary/90 font-black shadow-lg shadow-primary/20">
+              <Button 
+                onClick={() => {
+                  resetForm();
+                  setIsAddOpen(true);
+                }}
+                className="w-full rounded-2xl bg-primary hover:bg-primary/90 font-black shadow-lg shadow-primary/20"
+              >
                 <Plus className="size-4 mr-2" />
                 Tambah Target
               </Button>
@@ -395,6 +414,16 @@ export function SavingsTabContent({
                       )}
                     />
                   </InputGroup>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
+                    Batas Waktu (Opsional)
+                  </Label>
+                  <DatePicker
+                    value={newDueDate}
+                    onChange={(val) => setNewDueDate(val)}
+                    placeholder="Pilih tanggal target"
+                  />
                 </div>
                 <div className="space-y-3">
                   <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
@@ -488,6 +517,7 @@ export function SavingsTabContent({
                                 ),
                               );
                               setNewIcon(goal.iconName || "Target");
+                              setNewDueDate(goal.dueDate || "");
                               setIsEditOpen(true);
                             }}
                             className="rounded-lg text-xs font-bold py-2 gap-2 focus:bg-primary/10 focus:text-primary transition-colors cursor-pointer"
@@ -512,10 +542,47 @@ export function SavingsTabContent({
                   <CardTitle className="text-xl font-black group-hover:text-primary transition-colors">
                     {goal.name}
                   </CardTitle>
-                  <CardDescription className="flex items-center gap-2 mt-1 font-medium text-xs">
-                    <Calendar className="size-3" />
-                    Target: {goal.dueDate || "Tanpa batas waktu"}
-                  </CardDescription>
+                  <div className="flex flex-wrap items-center gap-y-2 gap-x-3 mt-1.5">
+                    <CardDescription className="flex items-center gap-1.5 font-bold text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                      <Calendar className="size-3 text-primary/60" />
+                      {goal.dueDate ? (
+                        format(new Date(goal.dueDate), "dd MMM yyyy", {
+                          locale: id,
+                        })
+                      ) : (
+                        "Tanpa Batas Waktu"
+                      )}
+                    </CardDescription>
+
+                    {goal.dueDate && (
+                      <div
+                        className={cn(
+                          "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tight flex items-center gap-1",
+                          (() => {
+                            const daysLeft = differenceInDays(
+                              new Date(goal.dueDate),
+                              startOfToday(),
+                            );
+                            if (daysLeft > 7)
+                              return "bg-primary/10 text-primary border border-primary/20";
+                            if (daysLeft >= 0)
+                              return "bg-amber-500/10 text-amber-500 border border-amber-500/20";
+                            return "bg-rose-500/10 text-rose-500 border border-rose-500/20";
+                          })(),
+                        )}
+                      >
+                        {(() => {
+                          const daysLeft = differenceInDays(
+                            new Date(goal.dueDate),
+                            startOfToday(),
+                          );
+                          if (daysLeft > 0) return `${daysLeft} Hari Lagi`;
+                          if (daysLeft === 0) return "Hari Terakhir!";
+                          return `Terlewat ${Math.abs(daysLeft)} Hari`;
+                        })()}
+                      </div>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-6 pt-4">
                   <div className="flex justify-between items-end">
@@ -604,7 +671,10 @@ export function SavingsTabContent({
               description="Wujudkan impianmu dengan mulai menetapkan target tabungan hari ini."
             />
             <Button
-              onClick={() => setIsAddOpen(true)}
+              onClick={() => {
+                resetForm();
+                setIsAddOpen(true);
+              }}
               variant="outline"
               className="rounded-xl border-primary/30 text-primary font-bold mt-2"
             >
@@ -614,7 +684,13 @@ export function SavingsTabContent({
         )}
       </div>
 
-      <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
+      <Sheet 
+        open={isEditOpen} 
+        onOpenChange={(open) => {
+          setIsEditOpen(open);
+          if (!open) resetForm();
+        }}
+      >
         <SheetContent
           side="right"
           className="w-full sm:max-w-lg bg-background/40 backdrop-blur-3xl border-l border-white/10 shadow-2xl overflow-hidden p-0 gap-0 focus:outline-none flex flex-col"
@@ -663,6 +739,16 @@ export function SavingsTabContent({
                   )}
                 />
               </InputGroup>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
+                Ubah Batas Waktu (Opsional)
+              </Label>
+              <DatePicker
+                value={newDueDate}
+                onChange={(val) => setNewDueDate(val)}
+                placeholder="Pilih tanggal target"
+              />
             </div>
             <div className="space-y-3">
               <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 ml-1">
