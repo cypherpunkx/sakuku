@@ -136,10 +136,12 @@ export function ExpenseTabContent({
 
   const [searchValue, setSearchValue] = useState(currentSearch);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Sync internal search state with URL when URL changes externally
   useEffect(() => {
     setSearchValue(currentSearch);
+    setIsMounted(true);
   }, [currentSearch]);
 
   const updateFilters = useCallback(
@@ -200,25 +202,11 @@ export function ExpenseTabContent({
           const needsRatio = currentNeedsTotal / income;
           const factor = needsRatio > 0.5 ? 0.95 : 1.1;
           suggestedBudget = item.value > 0 ? item.value * factor : income * 0.1;
-        } else if (
-          item.priority === "Keinginan" ||
-          item.priority === "Lainnya"
-        ) {
+        } else if (item.priority === "Keinginan") {
           // Target Ideal: 30%
           const wantsRatio = currentWantsTotal / income;
           const factor = wantsRatio > 0.3 ? 0.75 : 0.85;
           suggestedBudget = item.value > 0 ? item.value * factor : 0;
-        } else if (item.priority === "Tabungan") {
-          // Target Ideal: 20%
-          // Jika tabungan saat ini rendah, paksa alokasi ke 20% / jumlah kategori tabungan
-          const savingsCount =
-            dataPengeluaran.filter((i) => i.priority === "Tabungan").length ||
-            1;
-          const idealSavingsPerCat = (income * 0.2) / savingsCount;
-          suggestedBudget =
-            item.value < idealSavingsPerCat
-              ? idealSavingsPerCat
-              : item.value * 1.1;
         }
 
         // Round to nearest 25.000 untuk presisi yang lebih humanis
@@ -431,8 +419,13 @@ export function ExpenseTabContent({
             <CardDescription>Persentase pengeluaran.</CardDescription>
           </CardHeader>
           <CardContent className="h-[240px] min-h-[240px] flex items-center justify-center relative">
-            {dataPengeluaran.some((d) => d.value > 0) ? (
-              <ResponsiveContainer width="100%" height="100%" debounce={100}>
+            {isMounted && dataPengeluaran.some((d) => d.value > 0) ? (
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                debounce={100}
+                minWidth={0}
+              >
                 <PieChart>
                   <Pie
                     data={dataPengeluaran}
@@ -610,16 +603,13 @@ export function ExpenseTabContent({
               <Table className="w-full">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-muted/30">
-                    <TableHead className="w-[120px] text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4 pl-6">
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4 pl-6">
                       Tanggal
                     </TableHead>
                     <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4">
-                      Keterangan
+                      Keterangan & Kategori
                     </TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4">
-                      Kategori
-                    </TableHead>
-                    <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4">
+                    <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4 pr-6">
                       Jumlah
                     </TableHead>
                     <TableHead className="w-[50px] py-4"></TableHead>
@@ -638,41 +628,64 @@ export function ExpenseTabContent({
                           month: "short",
                         })}
                       </TableCell>
-                      <TableCell className="font-medium">
-                        {row.description || row.store}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <Badge
-                            variant="secondary"
-                            className="w-fit font-normal bg-muted/40"
-                          >
-                            {row.category?.name || "Lainnya"}
-                          </Badge>
-                          {row.type === "expense" && row.category?.priority && (
-                            <span
-                              className={cn(
-                                "text-[8px] font-black uppercase tracking-widest ml-1",
-                                row.category.priority === "Kebutuhan"
-                                  ? "text-rose-500"
-                                  : "text-amber-500",
-                              )}
+                      <TableCell className="py-4 pl-6">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="font-bold text-sm text-white tracking-tight">
+                            {row.description || row.store}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[10px] font-bold"
+                              style={{
+                                backgroundColor: row.category?.color
+                                  ? `${row.category.color}10`
+                                  : undefined,
+                                color: row.category?.color || undefined,
+                                borderColor: row.category?.color
+                                  ? `${row.category.color}25`
+                                  : undefined,
+                              }}
                             >
-                              {row.category.priority}
-                            </span>
-                          )}
+                              {row.category?.name || "Lainnya"}
+                            </div>
+                            {row.type === "expense" &&
+                              row.category?.priority && (
+                                <>
+                                  <div className="size-1 rounded-full bg-white/10" />
+                                  <span
+                                    className={cn(
+                                      "text-[9px] font-black uppercase tracking-widest opacity-40",
+                                      row.category.priority === "Kebutuhan"
+                                        ? "text-rose-500"
+                                        : "text-amber-500",
+                                    )}
+                                  >
+                                    {row.category.priority}
+                                  </span>
+                                </>
+                              )}
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell
-                        className={cn(
-                          "text-right font-mono font-bold",
-                          row.type === "income"
-                            ? "text-emerald-500"
-                            : "text-rose-500",
-                        )}
-                      >
-                        {row.type === "income" ? "+" : "-"}
-                        {formatCurrency(row.amount, currency)}
+                      <TableCell className="text-right py-4 pr-6">
+                        <div className="flex flex-col items-end gap-1">
+                          <span
+                            className={cn(
+                              "font-mono font-bold text-base",
+                              row.type === "income"
+                                ? "text-emerald-500"
+                                : "text-rose-500",
+                            )}
+                          >
+                            {row.type === "income" ? "+" : "-"}Rp{" "}
+                            {row.amount.toLocaleString("id-ID")}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/30 font-bold uppercase tracking-widest">
+                            {row.type === "income"
+                              ? "Pemasukan"
+                              : "Pengeluaran"}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right pr-6">
                         <DropdownMenu>

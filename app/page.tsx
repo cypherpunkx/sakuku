@@ -19,8 +19,8 @@ export default function Home() {
             Atur keuangan pribadi Anda dengan lebih cerdas dan estetis.
           </p>
           <div className="flex gap-4 mt-4">
-            <Button asChild size="lg" className="rounded-full px-8">
-              <a href="/dashboard">Go to Dashboard</a>
+            <Button asChild size="lg" className="rounded-full px-8 bg-primary hover:bg-primary/90 font-bold shadow-lg shadow-primary/20">
+              <a href="/dashboard">Mulai Sekarang</a>
             </Button>
             <Button
               variant="outline"

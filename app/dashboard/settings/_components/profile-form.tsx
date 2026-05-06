@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { User, Mail, Link as LinkIcon, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -22,6 +22,24 @@ export function ProfileForm({ user }: ProfileFormProps) {
     image: user?.image || "",
   });
 
+  // Load draft
+  useEffect(() => {
+    const saved = sessionStorage.getItem("sakuku_profile_draft");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setFormData((p) => ({ ...p, ...parsed }));
+      } catch (e) {}
+    }
+  }, []);
+
+  // Save draft
+  useEffect(() => {
+    if (formData.name !== (user?.name || "") || formData.email !== (user?.email || "")) {
+      sessionStorage.setItem("sakuku_profile_draft", JSON.stringify(formData));
+    }
+  }, [formData, user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -32,6 +50,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
         toast.success("Profil berhasil diperbarui!", {
           description: "Data Anda telah tersimpan dengan aman.",
         });
+        sessionStorage.removeItem("sakuku_profile_draft");
       } else {
         toast.error("Gagal memperbarui profil", {
           description: result.error,

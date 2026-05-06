@@ -1,14 +1,12 @@
 "use server";
 
+import "server-only";
 import { db } from "../db";
 import * as schema from "../db/schema";
-import { eq, and, desc, sql, or, like, SQL } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-
-const CURRENT_USER_ID = "user_1";
-
+import { verifySession } from "../dal";
 import { getUser } from "./dashboard.actions";
-
 import { transactionSchema } from "../validations";
 
 export async function addTransaction(data: any) {
@@ -19,14 +17,20 @@ export async function addTransaction(data: any) {
   });
 
   if (!category) {
-    const result = await db.insert(schema.categories).values({
-      name: formData.categoryName,
-      type: formData.type,
-      color: formData.type === "expense" ? "#ef4444" : "#10b981",
-      priority: "Lainnya",
-    }).returning();
+    const result = await db
+      .insert(schema.categories)
+      .values({
+        name: formData.categoryName,
+        type: formData.type,
+        color: formData.type === "expense" ? "#ef4444" : "#10b981",
+        priority: "Kebutuhan",
+      })
+      .returning();
     category = result[0];
   }
+
+  const session = await verifySession();
+  if (!session.isAuth || !session.userId) throw new Error("Unauthorized");
 
   await db.insert(schema.transactions).values({
     amount: formData.amount,
@@ -35,7 +39,7 @@ export async function addTransaction(data: any) {
     description: formData.description || formData.categoryName,
     store: formData.store,
     date: formData.date || new Date().toLocaleDateString("en-CA"),
-    userId: CURRENT_USER_ID,
+    userId: session.userId,
   });
 
   const user = await getUser();
@@ -44,7 +48,10 @@ export async function addTransaction(data: any) {
       formData.type === "income"
         ? (user.balance ?? 0) + formData.amount
         : (user.balance ?? 0) - formData.amount;
-    await db.update(schema.users).set({ balance: newBalance }).where(eq(schema.users.id, CURRENT_USER_ID));
+    await db
+      .update(schema.users)
+      .set({ balance: newBalance })
+      .where(eq(schema.users.id, session.userId));
   }
 
   revalidatePath("/dashboard", "layout");
@@ -53,33 +60,48 @@ export async function addTransaction(data: any) {
 export async function updateTransaction(id: number, data: any) {
   const validatedData = transactionSchema.parse(data);
   const formData = validatedData;
+  const session = await verifySession();
+  if (!session.isAuth || !session.userId) throw new Error("Unauthorized");
+
   const oldTx = await db.query.transactions.findFirst({
-    where: eq(schema.transactions.id, id),
+    where: and(
+      eq(schema.transactions.id, id),
+      eq(schema.transactions.userId, session.userId),
+    ),
   });
-  if (!oldTx) return;
+  if (!oldTx)
+    throw new Error(
+      "Transaksi tidak ditemukan atau Anda tidak memiliki akses.",
+    );
 
   let category = await db.query.categories.findFirst({
     where: eq(schema.categories.name, formData.categoryName),
   });
 
   if (!category) {
-    const result = await db.insert(schema.categories).values({
-      name: formData.categoryName,
-      type: formData.type,
-      color: formData.type === "expense" ? "#ef4444" : "#10b981",
-      priority: "Lainnya",
-    }).returning();
+    const result = await db
+      .insert(schema.categories)
+      .values({
+        name: formData.categoryName,
+        type: formData.type,
+        color: formData.type === "expense" ? "#ef4444" : "#10b981",
+        priority: "Kebutuhan",
+      })
+      .returning();
     category = result[0];
   }
 
-  await db.update(schema.transactions).set({
-    amount: formData.amount,
-    categoryId: category.id,
-    type: formData.type,
-    description: formData.description || formData.categoryName,
-    store: formData.store,
-    date: formData.date || oldTx.date,
-  }).where(eq(schema.transactions.id, id));
+  await db
+    .update(schema.transactions)
+    .set({
+      amount: formData.amount,
+      categoryId: category.id,
+      type: formData.type,
+      description: formData.description || formData.categoryName,
+      store: formData.store,
+      date: formData.date || oldTx.date,
+    })
+    .where(eq(schema.transactions.id, id));
 
   const user = await getUser();
   if (user) {
@@ -90,18 +112,27 @@ export async function updateTransaction(id: number, data: any) {
     if (formData.type === "income") balance += formData.amount;
     else balance -= formData.amount;
 
-    await db.update(schema.users).set({ balance }).where(eq(schema.users.id, CURRENT_USER_ID));
+    await db
+      .update(schema.users)
+      .set({ balance })
+      .where(eq(schema.users.id, session.userId));
   }
 
   revalidatePath("/dashboard", "layout");
 }
 
 export async function deleteTransaction(id: number) {
+  const session = await verifySession();
+  if (!session.isAuth || !session.userId) throw new Error("Unauthorized");
+
   const transaction = await db.query.transactions.findFirst({
-    where: eq(schema.transactions.id, id),
+    where: and(
+      eq(schema.transactions.id, id),
+      eq(schema.transactions.userId, session.userId),
+    ),
   });
 
-  // If already deleted, just return (idempotency)
+  // If not found or no access
   if (!transaction) return;
 
   // 1. Delete transaction
@@ -118,7 +149,7 @@ export async function deleteTransaction(id: number) {
     await db
       .update(schema.users)
       .set({ balance: newBalance })
-      .where(eq(schema.users.id, CURRENT_USER_ID));
+      .where(eq(schema.users.id, session.userId));
   }
 
   // 3. If this was a bill payment, revert bill status to unpaid
@@ -126,13 +157,21 @@ export async function deleteTransaction(id: number) {
     await db
       .update(schema.bills)
       .set({ isPaid: false })
-      .where(eq(schema.bills.id, transaction.billId));
+      .where(
+        and(
+          eq(schema.bills.id, transaction.billId),
+          eq(schema.bills.userId, session.userId),
+        ),
+      );
   }
 
   // 4. If this was a savings contribution, revert goal current amount
   if (transaction.goalId) {
     const goal = await db.query.savingsGoals.findFirst({
-      where: eq(schema.savingsGoals.id, transaction.goalId),
+      where: and(
+        eq(schema.savingsGoals.id, transaction.goalId),
+        eq(schema.savingsGoals.userId, session.userId),
+      ),
     });
 
     if (goal) {
@@ -156,7 +195,7 @@ export async function addCategory(formData: {
   type: "income" | "expense";
   color?: string;
   icon?: string;
-  priority?: "Kebutuhan" | "Keinginan" | "Tabungan" | "Lainnya";
+  priority?: "Kebutuhan" | "Keinginan";
 }) {
   await db.insert(schema.categories).values({
     ...formData,
@@ -187,12 +226,14 @@ export async function updateCategory(
     type: "income" | "expense";
     color?: string;
     icon?: string;
-    priority?: "Kebutuhan" | "Keinginan" | "Tabungan" | "Lainnya";
-  }
+    priority?: "Kebutuhan" | "Keinginan";
+  },
 ) {
-  await db.update(schema.categories).set({
-    ...formData,
-  }).where(eq(schema.categories.id, id));
+  await db
+    .update(schema.categories)
+    .set({
+      ...formData,
+    })
+    .where(eq(schema.categories.id, id));
   revalidatePath("/dashboard", "layout");
 }
-

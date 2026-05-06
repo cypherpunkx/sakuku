@@ -20,6 +20,7 @@ import {
   Cell,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -57,6 +58,12 @@ export function StatisticsTabContent({
   targetMonth,
   comparison,
 }: StatisticsTabContentProps) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Format data for the chart
   const chartData = dailyStats.map((item) => {
     const d = new Date(item.date);
@@ -337,8 +344,8 @@ export function StatisticsTabContent({
           </div>
         </CardHeader>
         <CardContent className="h-[400px] w-full pt-0">
-          {hasChartData ? (
-            <ResponsiveContainer width="100%" height="100%" debounce={100}>
+          {isMounted && hasChartData ? (
+            <ResponsiveContainer width="100%" height="100%" debounce={100} minWidth={0}>
               <AreaChart
                 data={chartData}
                 margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
@@ -454,8 +461,8 @@ export function StatisticsTabContent({
             </CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
-            {hasCategoryData ? (
-              <ResponsiveContainer width="100%" height="100%" debounce={100}>
+            {isMounted && hasCategoryData ? (
+              <ResponsiveContainer width="100%" height="100%" debounce={100} minWidth={0}>
                 <PieChart>
                   <Pie
                     data={categoryStats}

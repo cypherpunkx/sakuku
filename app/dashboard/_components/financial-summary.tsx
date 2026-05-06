@@ -157,7 +157,7 @@ export function FinancialSummary({
           <Card
             key={item.title}
             className={cn(
-              "border-border/40 bg-card/30 backdrop-blur-md shadow-xl overflow-hidden group relative transition-all duration-500 hover:shadow-2xl cursor-default",
+              "border-border/40 bg-card/30 backdrop-blur-md rounded-3xl shadow-xl overflow-hidden group relative transition-all duration-500 hover:shadow-2xl cursor-default",
               item.hoverBorder
             )}
             style={{ transform: "translateZ(0)" }}

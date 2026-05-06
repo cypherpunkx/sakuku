@@ -181,13 +181,19 @@ export function AppSidebar({ user }: { user?: any }) {
           </SidebarMenuItem>
           
           <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
-            <SidebarMenuButton 
-              aria-label="Keluar dari akun"
-              className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 rounded-xl font-bold py-5 transition-all mt-2"
-            >
-              <LogOut className="size-4 mr-2" />
-              Keluar
-            </SidebarMenuButton>
+            <form action={async () => {
+              const { signOut } = await import("@/lib/actions/auth.actions");
+              await signOut();
+            }}>
+              <SidebarMenuButton 
+                type="submit"
+                aria-label="Keluar dari akun"
+                className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 rounded-xl font-bold py-5 transition-all mt-2 w-full"
+              >
+                <LogOut className="size-4 mr-2" />
+                Keluar
+              </SidebarMenuButton>
+            </form>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

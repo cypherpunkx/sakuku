@@ -41,22 +41,26 @@ export function HealthTabContent({
   const [efMonths, setEfMonths] = useState(6); // Default 6 months
 
   // 1. Dana Darurat Analysis
-  const monthlyEssential = totalKebutuhan || (totalIncome * 0.5);
+  // Pastikan ada nilai minimal agar tidak terjadi pembagian dengan nol (NaN)
+  const monthlyEssential = Math.max(totalKebutuhan || (totalIncome * 0.5), 1);
   const targetEF = monthlyEssential * efMonths;
   const currentEF = Math.max(currentBalance, 0);
-  const efProgress = Math.min((currentEF / targetEF) * 100, 100);
+  
+  // Hitung progres dengan fallback jika targetEF tetap 0 (meskipun sudah di-max)
+  const rawEfProgress = targetEF > 0 ? (currentEF / targetEF) * 100 : 0;
+  const efProgress = Math.min(isNaN(rawEfProgress) ? 0 : rawEfProgress, 100);
   const isEFSafe = efProgress >= 100;
 
   // 2. Savings Rate Analysis
   const currentSavings = totalIncome - (totalKebutuhan + totalKeinginan);
-  const savingsRate = totalIncome > 0 ? (currentSavings / totalIncome) * 100 : 0;
+  const rawSavingsRate = totalIncome > 0 ? (currentSavings / totalIncome) * 100 : 0;
+  const savingsRate = isNaN(rawSavingsRate) ? 0 : rawSavingsRate;
   const isSavingsHealthy = savingsRate >= 20;
 
   // 3. Overall Health Score (Simple calculation)
-  const healthScore = Math.round(
-    (Math.min(efProgress, 100) * 0.6) + 
-    (Math.min(savingsRate * 5, 100) * 0.4)
-  );
+  const rawScore = (Math.min(efProgress, 100) * 0.6) + 
+                   (Math.min(savingsRate * 5, 100) * 0.4);
+  const healthScore = isNaN(rawScore) ? 0 : Math.round(rawScore);
 
   return (
     <div className="space-y-6">

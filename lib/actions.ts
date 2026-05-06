@@ -14,7 +14,7 @@ export { upsertBudget, resetBudgets } from "./actions/budget.actions";
 export { payBill, addBill, deleteBill } from "./actions/bill.actions";
 export { addSavingGoal, updateSavingGoal, deleteSavingGoal, addSavingContribution } from "./actions/saving.actions";
 export { getLearningData, toggleArticleProgress, toggleBookmark } from "./actions/learning.actions";
-export { updateUserProfile, updateFinanceSettings, updateSecuritySettings, updateNotificationSettings } from "./actions/user.actions";
+export { updateUserProfile, updateFinanceSettings, updateSecuritySettings, updateNotificationSettings, completeOnboarding } from "./actions/user.actions";
 
 
 

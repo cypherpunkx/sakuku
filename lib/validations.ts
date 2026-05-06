@@ -16,7 +16,7 @@ export const categorySchema = z.object({
   type: z.enum(["income", "expense"]),
   color: z.string().optional(),
   icon: z.string().optional(),
-  priority: z.enum(["Kebutuhan", "Keinginan", "Tabungan", "Lainnya"]).optional(),
+  priority: z.enum(["Kebutuhan", "Keinginan"]).optional(),
 });
 
 // Budget Schema
@@ -54,7 +54,7 @@ export const billSchema = z.object({
 export const userProfileSchema = z.object({
   name: z.string().min(1).optional(),
   email: z.string().email().optional(),
-  image: z.string().url().optional(),
+  image: z.string().url().optional().or(z.literal("")),
 });
 
 // Finance Settings Schema
@@ -73,4 +73,15 @@ export const notificationSettingsSchema = z.object({
   emailNotifications: z.boolean().optional(),
   pushNotifications: z.boolean().optional(),
   weeklyReport: z.boolean().optional(),
+});
+// Auth Schemas
+export const loginSchema = z.object({
+  email: z.string().email("Email tidak valid"),
+  password: z.string().min(6, "Password minimal 6 karakter"),
+});
+
+export const registerSchema = z.object({
+  name: z.string().min(2, "Nama minimal 2 karakter"),
+  email: z.string().email("Email tidak valid"),
+  password: z.string().min(6, "Password minimal 6 karakter"),
 });

@@ -96,15 +96,50 @@ export function BudgetTabContent({
   const [budgetValues, setBudgetValues] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Initialize budget values
+  const DRAFT_KEY = "sakuku_budget_draft";
+
+  // Initialize budget values (only once on mount or when initialBudgets change)
   useEffect(() => {
+    if (isInitialized) return;
+
     const initialValues: Record<number, number> = {};
     initialBudgets.forEach((b) => {
       if (b.categoryId) initialValues[b.categoryId] = b.amountLimit;
     });
-    setBudgetValues(initialValues);
-  }, [initialBudgets]);
+
+    // Check for draft in sessionStorage
+    try {
+      const draft = sessionStorage.getItem(DRAFT_KEY);
+      if (draft) {
+        const parsedDraft = JSON.parse(draft);
+        // Merge draft with initial values (draft takes priority)
+        setBudgetValues({ ...initialValues, ...parsedDraft });
+        toast.info("Draft anggaran dipulihkan", {
+          description: "Perubahan yang belum disimpan telah dimuat kembali.",
+          duration: 3000,
+        });
+      } else {
+        setBudgetValues(initialValues);
+      }
+    } catch (e) {
+      setBudgetValues(initialValues);
+    }
+    
+    setIsInitialized(true);
+  }, [initialBudgets, isInitialized]);
+
+  // Save draft to sessionStorage whenever values change
+  useEffect(() => {
+    if (!isInitialized || Object.keys(budgetValues).length === 0) return;
+    
+    const timeoutId = setTimeout(() => {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(budgetValues));
+    }, 500); // Debounce save
+
+    return () => clearTimeout(timeoutId);
+  }, [budgetValues, isInitialized]);
 
   const expenseCategories = allCategories.filter(
     (cat) => cat.type === "expense",
@@ -117,7 +152,9 @@ export function BudgetTabContent({
         upsertBudget(Number(catId), amount),
       );
       await Promise.all(promises);
+      sessionStorage.removeItem(DRAFT_KEY);
       toast.success("Anggaran berhasil disimpan!");
+      router.refresh(); // Refresh to get updated server data
     } catch (error) {
       toast.error("Gagal menyimpan anggaran");
     } finally {
@@ -130,8 +167,10 @@ export function BudgetTabContent({
     try {
       await resetBudgets();
       setBudgetValues({});
+      sessionStorage.removeItem(DRAFT_KEY);
       toast.success("Anggaran berhasil direset!");
       setIsResetDialogOpen(false);
+      router.refresh();
     } catch (error) {
       toast.error("Gagal mereset anggaran");
     } finally {

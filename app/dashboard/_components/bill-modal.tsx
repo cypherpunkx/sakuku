@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Sheet,
   SheetContent,
@@ -61,6 +61,26 @@ export function BillModal({ open, onOpenChange }: BillModalProps) {
     iconName: "Zap",
   });
 
+  // Load draft from sessionStorage
+  useEffect(() => {
+    const savedDraft = sessionStorage.getItem("sakuku_bill_draft");
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        setFormData((p) => ({ ...p, ...parsed }));
+      } catch (e) {
+        console.error("Failed to load bill draft", e);
+      }
+    }
+  }, []);
+
+  // Save draft to sessionStorage
+  useEffect(() => {
+    if (formData.name || formData.amount || formData.provider) {
+      sessionStorage.setItem("sakuku_bill_draft", JSON.stringify(formData));
+    }
+  }, [formData]);
+
   const handleSave = async () => {
     if (!formData.name || !formData.amount) {
       toast.error("Mohon isi nama tagihan dan jumlah");
@@ -74,6 +94,7 @@ export function BillModal({ open, onOpenChange }: BillModalProps) {
         amount: parseInt(formData.amount.replace(/\./g, "")) || 0,
       });
       toast.success("Tagihan baru berhasil ditambahkan");
+      sessionStorage.removeItem("sakuku_bill_draft");
       onOpenChange(false);
       setFormData({
         name: "",

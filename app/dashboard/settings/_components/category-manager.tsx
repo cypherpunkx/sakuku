@@ -1,24 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Trash2,
   Edit2,
   Search,
-  ShoppingBag,
-  Utensils,
-  Car,
-  Smartphone,
-  Home,
-  Heart,
-  Gift,
-  Briefcase,
-  TrendingUp,
-  Wallet,
-  CreditCard,
-  PiggyBank,
   PlusCircle,
+  ShoppingBag,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -65,28 +54,8 @@ import {
   updateCategory,
 } from "@/lib/actions/transaction.actions";
 import { cn } from "@/lib/utils";
-import { PRESET_COLORS, PRIORITY_OPTIONS } from "@/lib/constants";
-
-interface CategoryManagerProps {
-  categories: any[];
-}
-
-const iconMap: Record<string, any> = {
-  ShoppingBag,
-  Utensils,
-  Car,
-  Smartphone,
-  Home,
-  Heart,
-  Gift,
-  Briefcase,
-  TrendingUp,
-  Wallet,
-  CreditCard,
-  PiggyBank,
-};
-
-const presetIcons = Object.keys(iconMap);
+import { PRESET_COLORS, ICON_MAP, AVAILABLE_ICONS } from "@/lib/constants";
+import { Category, CategoryManagerProps } from "@/types";
 
 export function CategoryManager({ categories }: CategoryManagerProps) {
   const [activeTab, setActiveTab] = useState<"expense" | "income">("expense");
@@ -105,11 +74,45 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
     priority: "Kebutuhan" as "Kebutuhan" | "Keinginan",
   });
 
+  const isLightColor = (color: string): boolean => {
+    const hex = color.replace("#", "");
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness > 155;
+  };
+
   const filteredCategories = categories.filter(
     (c) =>
       c.type === activeTab &&
       c.name.toLowerCase().includes(search.toLowerCase()),
   );
+
+  // Load draft from sessionStorage
+  useEffect(() => {
+    const savedDraft = sessionStorage.getItem("sakuku_category_draft");
+    if (savedDraft && !editingCategory) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        setFormData((p) => ({ ...p, ...parsed }));
+        // If there's a draft name, and it's not open, we might not want to open it automatically,
+        // but the state will be there when they click "Tambah".
+      } catch (e) {
+        console.error("Failed to load category draft", e);
+      }
+    }
+  }, [editingCategory]);
+
+  // Save draft to sessionStorage
+  useEffect(() => {
+    if (
+      !editingCategory &&
+      (formData.name || formData.icon !== "ShoppingBag")
+    ) {
+      sessionStorage.setItem("sakuku_category_draft", JSON.stringify(formData));
+    }
+  }, [formData, editingCategory]);
 
   const resetForm = () => {
     setFormData({
@@ -120,6 +123,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
       priority: "Kebutuhan",
     });
     setEditingCategory(null);
+    sessionStorage.removeItem("sakuku_category_draft");
   };
 
   const handleSave = async () => {
@@ -129,12 +133,18 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
     }
 
     try {
+      const dataToSave = {
+        ...formData,
+        priority: formData.type === "expense" ? formData.priority : undefined,
+      };
+
       if (editingCategory) {
-        await updateCategory(editingCategory.id, formData);
+        await updateCategory(editingCategory.id, dataToSave);
         toast.success("Kategori berhasil diperbarui!");
       } else {
-        await addCategory(formData);
+        await addCategory(dataToSave);
         toast.success("Kategori baru berhasil ditambahkan!");
+        sessionStorage.removeItem("sakuku_category_draft");
       }
       setIsDialogOpen(false);
       resetForm();
@@ -195,14 +205,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
           }}
         >
           <DialogTrigger asChild>
-            <Button
-              className={cn(
-                "font-bold rounded-xl shadow-lg transition-all hover:scale-105",
-                activeTab === "expense"
-                  ? "bg-linear-to-r from-rose-600 to-rose-500 text-white shadow-rose-500/20"
-                  : "bg-linear-to-r from-emerald-600 to-emerald-500 text-white shadow-emerald-500/20",
-              )}
-            >
+            <Button className="font-bold rounded-xl shadow-lg transition-all hover:scale-105 bg-gradient-premium text-primary-foreground shadow-primary/20">
               <PlusCircle className="size-4 mr-2" />
               Tambah
             </Button>
@@ -234,8 +237,14 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
               <div className="grid gap-3">
                 <Label>Pilih Ikon</Label>
                 <div className="grid grid-cols-6 gap-2 p-2 rounded-xl bg-background/50 border border-border/40">
-                  {presetIcons.map((iconName) => {
-                    const Icon = iconMap[iconName];
+                  {AVAILABLE_ICONS.map(({ id: iconName, icon: Icon }) => {
+                    const isSelected = formData.icon === iconName;
+                    const iconColorClass = isSelected
+                      ? isLightColor(formData.color)
+                        ? "text-black"
+                        : "text-white"
+                      : "text-muted-foreground hover:bg-white/5";
+
                     return (
                       <button
                         key={iconName}
@@ -245,15 +254,14 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                         aria-label={`Pilih ikon ${iconName}`}
                         className={cn(
                           "size-10 rounded-xl flex items-center justify-center transition-all duration-300",
-                          formData.icon === iconName
-                            ? "text-white shadow-lg scale-110 ring-2 ring-white/20"
-                            : "hover:bg-white/5 text-muted-foreground",
+                          isSelected &&
+                            "shadow-lg scale-110 ring-2 ring-white/20",
+                          iconColorClass,
                         )}
                         style={{
-                          backgroundColor:
-                            formData.icon === iconName
-                              ? formData.color
-                              : undefined,
+                          backgroundColor: isSelected
+                            ? formData.color
+                            : undefined,
                         }}
                       >
                         <Icon className="size-5" />
@@ -335,12 +343,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
               </Button>
               <Button
                 onClick={handleSave}
-                className={cn(
-                  "font-bold rounded-xl px-8 transition-all",
-                  formData.type === "expense"
-                    ? "bg-linear-to-r from-rose-600 to-rose-500 text-white shadow-rose-500/20"
-                    : "bg-linear-to-r from-emerald-600 to-emerald-500 text-white shadow-emerald-500/20",
-                )}
+                className="font-bold rounded-xl px-8 transition-all bg-gradient-premium text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/30"
               >
                 {editingCategory ? "Simpan Perubahan" : "Simpan Kategori"}
               </Button>
@@ -420,7 +423,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
             ) : (
               <div className="grid gap-2">
                 {filteredCategories.map((cat) => {
-                  const Icon = iconMap[cat.icon] || ShoppingBag;
+                  const Icon = (cat.icon && ICON_MAP[cat.icon]) || ShoppingBag;
                   return (
                     <div
                       key={cat.id}
@@ -428,8 +431,13 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                     >
                       <div className="flex items-center gap-4">
                         <div
-                          className="size-10 rounded-xl flex items-center justify-center text-white shadow-lg shadow-black/5"
-                          style={{ backgroundColor: cat.color || "#primary" }}
+                          className="size-10 rounded-xl flex items-center justify-center shadow-lg shadow-black/5"
+                          style={{
+                            backgroundColor: cat.color || "var(--primary)",
+                            color: isLightColor(cat.color || "#ffffff")
+                              ? "#000000"
+                              : "#ffffff",
+                          }}
                         >
                           <Icon className="size-5" />
                         </div>
@@ -437,29 +445,22 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                           <p className="font-bold text-foreground">
                             {cat.name}
                           </p>
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "text-[10px] uppercase tracking-tighter font-medium py-0 h-4 border-muted-foreground/20",
-                              cat.priority === "Kebutuhan" &&
-                                "text-emerald-500 border-emerald-500/20 bg-emerald-500/5",
-                              cat.priority === "Keinginan" &&
-                                "text-amber-500 border-amber-500/20 bg-amber-500/5",
-                              cat.priority === "Tabungan" &&
-                                "text-blue-500 border-blue-500/20 bg-blue-500/5",
-                              !["Kebutuhan", "Keinginan", "Tabungan"].includes(
-                                cat.priority,
-                              ) && "text-muted-foreground",
-                            )}
-                          >
-                            {cat.priority === "Kebutuhan"
-                              ? "Kebutuhan (50%)"
-                              : cat.priority === "Keinginan"
-                                ? "Keinginan (30%)"
-                                : cat.priority === "Tabungan"
-                                  ? "Tabungan (20%)"
-                                  : cat.priority || "Lainnya"}
-                          </Badge>
+                          {cat.type === "expense" && (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[10px] uppercase tracking-tighter font-medium py-0 h-4 border-muted-foreground/20",
+                                cat.priority === "Kebutuhan" &&
+                                  "text-emerald-500 border-emerald-500/20 bg-emerald-500/5",
+                                cat.priority === "Keinginan" &&
+                                  "text-amber-500 border-amber-500/20 bg-amber-500/5",
+                              )}
+                            >
+                              {cat.priority === "Kebutuhan"
+                                ? "Kebutuhan (50%)"
+                                : "Keinginan (30%)"}
+                            </Badge>
+                          )}
                         </div>
                       </div>
 

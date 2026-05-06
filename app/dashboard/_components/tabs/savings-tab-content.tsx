@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { EmptyState } from "../empty-state";
-import { useOptimistic, useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition, useEffect } from "react";
 import {
   addSavingContribution,
   deleteSavingGoal,
@@ -146,6 +146,32 @@ export function SavingsTabContent({
   const [newIcon, setNewIcon] = useState("Target");
   const [newDueDate, setNewDueDate] = useState<string>("");
 
+  // Load draft
+  useEffect(() => {
+    const saved = sessionStorage.getItem("sakuku_savings_draft");
+    if (saved && !isEditOpen) {
+      try {
+        const parsed = JSON.parse(saved);
+        setNewName(parsed.name || "");
+        setNewTarget(parsed.target || "");
+        setNewIcon(parsed.icon || "Target");
+        setNewDueDate(parsed.dueDate || "");
+      } catch (e) {}
+    }
+  }, [isEditOpen]);
+
+  // Save draft
+  useEffect(() => {
+    if (!isEditOpen && (newName || newTarget)) {
+      sessionStorage.setItem("sakuku_savings_draft", JSON.stringify({
+        name: newName,
+        target: newTarget,
+        icon: newIcon,
+        dueDate: newDueDate
+      }));
+    }
+  }, [newName, newTarget, newIcon, newDueDate, isEditOpen]);
+
   const handleAddGoal = async () => {
     if (!newName || !newTarget) return;
     startTransition(async () => {
@@ -160,6 +186,7 @@ export function SavingsTabContent({
         toast.success("Target tabungan berhasil dibuat!", {
           description: "Mari mulai menabung untuk impianmu.",
         });
+        sessionStorage.removeItem("sakuku_savings_draft");
         setIsAddOpen(false);
         resetForm();
       } catch (error) {
@@ -179,6 +206,7 @@ export function SavingsTabContent({
           dueDate: newDueDate || null,
         });
         toast.success("Target berhasil diperbarui!");
+        sessionStorage.removeItem("sakuku_savings_draft");
         setIsEditOpen(false);
         resetForm();
       } catch (error) {

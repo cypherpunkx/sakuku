@@ -5,8 +5,7 @@ import * as schema from "../db/schema";
 import { eq, and, desc, sql, or, like, SQL } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-const CURRENT_USER_ID = "user_1";
-
+import { getUserId } from "../session";
 import { getUser } from "./dashboard.actions";
 import { billSchema } from "../validations";
 
@@ -50,7 +49,7 @@ export async function payBill(id: number) {
     description: `Bayar Tagihan: ${bill.name}`,
     store: bill.provider || bill.name,
     date: new Date().toLocaleDateString("en-CA"),
-    userId: CURRENT_USER_ID,
+    userId: await getUserId(),
     billId: bill.id,
   });
 
@@ -60,7 +59,7 @@ export async function payBill(id: number) {
     await db
       .update(schema.users)
       .set({ balance: (user.balance ?? 0) - bill.amount })
-      .where(eq(schema.users.id, CURRENT_USER_ID));
+      .where(eq(schema.users.id, await getUserId()));
   }
 
   revalidatePath("/dashboard", "layout");
@@ -71,7 +70,7 @@ export async function addBill(data: any) {
   const formData = validatedData;
   await db.insert(schema.bills).values({
     ...formData,
-    userId: CURRENT_USER_ID,
+    userId: await getUserId(),
   });
   revalidatePath("/dashboard", "layout");
 }
