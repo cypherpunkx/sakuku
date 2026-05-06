@@ -15,10 +15,13 @@ import {
   Zap,
   BookOpen,
   Lightbulb,
+  Clock,
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { EmptyState } from "../empty-state";
 import { toggleArticleProgress, toggleBookmark } from "@/lib/actions";
+import { cn } from "@/lib/utils";
 import { useTransition, useState } from "react";
 import {
   Sheet,
@@ -27,7 +30,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-
+import Image from "next/image";
 
 interface LearningTabContentProps {
   initialArticles?: any[];
@@ -48,6 +51,22 @@ export function LearningTabContent({
 }: LearningTabContentProps) {
   const [isPending, startTransition] = useTransition();
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
+  const [selectedCategory, setSelectedCategory] = useState("Semua");
+
+  const isFinancialCategory = (category: string) => {
+    const financialKeywords = ["keuangan", "investasi", "tabungan", "berita", "budgeting", "hutang", "pajak", "perencanaan", "ekonomi", "aset"];
+    return financialKeywords.some(key => category.toLowerCase().includes(key));
+  };
+
+  const categories = ["Semua", ...Array.from(new Set(initialArticles.map(a => a.category)))].filter(cat => {
+    if (cat === "Semua") return true;
+    return isFinancialCategory(cat);
+  });
+
+  const filteredArticles =
+    selectedCategory === "Semua"
+      ? initialArticles
+      : initialArticles.filter((a) => a.category === selectedCategory);
 
   const handleToggleProgress = (articleId: number) => {
     startTransition(async () => {
@@ -108,10 +127,11 @@ export function LearningTabContent({
               <div className="relative z-10 flex flex-col md:flex-row gap-8 p-8 md:p-10">
                 <div className="w-full md:w-48 h-48 rounded-[24px] overflow-hidden bg-primary/20 shrink-0 relative shadow-2xl shadow-primary/20">
                   {recommended.imageUrl ? (
-                    <img
+                    <Image
                       src={recommended.imageUrl}
                       alt={recommended.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-110"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-primary/30 to-indigo-500/30">
@@ -126,7 +146,7 @@ export function LearningTabContent({
                       {recommended.category}
                     </Badge>
                     <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">
-                      {recommended.read_time || "5 mnt baca"}
+                      {recommended.readTime || "5 mnt baca"}
                     </span>
                   </div>
                   <h4
@@ -191,23 +211,37 @@ export function LearningTabContent({
         </section>
 
         {/* Article Grid */}
-        <section id="articles-list" className="space-y-4 scroll-mt-20">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold flex items-center gap-2">
+        <section id="articles-list" className="space-y-6 scroll-mt-20">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-2 shrink-0 md:min-w-[240px]">
               <FileText className="size-5 text-primary" />
-              Materi Edukasi
-            </h3>
-            <Button
-              variant="link"
-              size="sm"
-              className="text-muted-foreground font-bold text-xs"
-            >
-              Lihat Semua
-            </Button>
+              <h3 className="text-lg font-bold whitespace-nowrap">
+                Materi Edukasi
+              </h3>
+            </div>
+            
+            {/* Category Pills - Safe Scrollable */}
+            <div className="flex-1 min-w-0 overflow-hidden flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-2 px-2 md:mx-0 md:px-0">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={cn(
+                    "whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border",
+                    selectedCategory === cat
+                      ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105"
+                      : "bg-muted/10 border-white/5 text-muted-foreground hover:border-white/20 hover:text-white",
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
+
           <div className="grid gap-4 md:grid-cols-2">
-            {initialArticles.length > 0 ? (
-              initialArticles.map((article, i) => (
+            {filteredArticles.length > 0 ? (
+              filteredArticles.map((article, i) => (
                 <Card
                   key={article.id}
                   className={`group relative overflow-hidden border-border/40 bg-card/30 hover:bg-card/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-1.5 cursor-pointer flex flex-col min-h-[280px] ${article.isCompleted ? "opacity-75 bg-muted/20" : ""}`}
@@ -216,13 +250,11 @@ export function LearningTabContent({
                   {/* Card Header Media */}
                   {article.isExternal && article.imageUrl ? (
                     <div className="relative w-full h-32 overflow-hidden border-b border-border/40">
-                      <img
+                      <Image
                         src={article.imageUrl}
                         alt={article.title}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        onError={(e) =>
-                          (e.currentTarget.style.display = "none")
-                        }
+                        fill
+                        className="object-cover transition-transform duration-700 group-hover:scale-110"
                       />
                       <div className="absolute inset-0 bg-linear-to-t from-background/80 to-transparent" />
                     </div>
@@ -311,7 +343,7 @@ export function LearningTabContent({
                     <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-auto pt-4 border-t border-border/10">
                       <div className="flex items-center gap-2">
                         <span className="flex items-center gap-1.5 font-bold bg-background/60 px-2 py-1 rounded-lg border border-border/40 text-primary">
-                          <FileText className="size-3.5" /> {article.read_time}
+                          <FileText className="size-3.5" /> {article.readTime}
                         </span>
                       </div>
                     </div>
@@ -332,7 +364,7 @@ export function LearningTabContent({
       </div>
 
       {/* Sidebar: Learning Progress & Recommendations */}
-      <div className="w-full lg:w-80 space-y-6">
+      <div className="w-full lg:w-80 space-y-6 lg:sticky lg:top-24 h-fit self-start">
         <Card className="border-primary/20 bg-primary/5 backdrop-blur-md">
           <CardHeader>
             <CardTitle className="text-sm font-bold uppercase tracking-widest text-primary flex items-center gap-2">
@@ -426,7 +458,7 @@ export function LearningTabContent({
         open={!!selectedArticle}
         onOpenChange={(open) => !open && setSelectedArticle(null)}
       >
-        <SheetContent 
+        <SheetContent
           side="right"
           className="w-full sm:max-w-2xl bg-[#0a0a0b] border-l border-border/40 flex flex-col p-0 gap-0 shadow-2xl shadow-primary/20 focus:outline-none"
         >
@@ -440,10 +472,11 @@ export function LearningTabContent({
                 <>
                   {currentArticle.imageUrl && (
                     <div className="w-full h-72 overflow-hidden relative">
-                      <img
+                      <Image
                         src={currentArticle.imageUrl}
                         alt={currentArticle.title}
-                        className="w-full h-full object-cover"
+                        fill
+                        className="object-cover"
                       />
                       <div className="absolute inset-0 bg-linear-to-t from-[#0a0a0b] via-[#0a0a0b]/20 to-transparent" />
                     </div>
@@ -474,20 +507,61 @@ export function LearningTabContent({
                           {currentArticle.title}
                         </SheetTitle>
 
-                        <div className="flex items-center gap-6 text-[11px] text-muted-foreground/60 font-bold uppercase tracking-widest border-y border-border/10 py-4">
-                          <span className="flex items-center gap-2">
-                            <FileText className="size-4 text-primary" />
-                            {currentArticle.read_time || "5 mnt baca"}
-                          </span>
+                        <div className="space-y-4 border-y border-border/10 py-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                                Kategori
+                              </Label>
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className="border-primary/30 bg-primary/5 text-primary text-[10px] font-bold px-3"
+                                >
+                                  {currentArticle.category}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                                Waktu Baca
+                              </Label>
+                              <div className="flex items-center gap-2 text-sm font-bold text-foreground/80">
+                                <Clock className="size-3.5 text-primary/60" />
+                                {currentArticle.readTime}
+                              </div>
+                            </div>
+                          </div>
+
                           {currentArticle.source && (
-                            <span className="flex items-center gap-2">
-                              <Award className="size-4 text-amber-500" />
-                              Source: {currentArticle.source}
-                            </span>
+                            <div className="space-y-1.5">
+                              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                                Sumber Informasi
+                              </Label>
+                              <div className="flex items-center gap-2 text-sm font-bold text-foreground/80">
+                                <Award className="size-3.5 text-amber-500" />
+                                {currentArticle.source}
+                              </div>
+                            </div>
                           )}
                         </div>
                       </SheetHeader>
                       <Separator className="bg-white/5" />
+
+                      {currentArticle.videoUrl && (
+                        <div className="aspect-video w-full rounded-[24px] overflow-hidden border border-white/10 bg-black/40 shadow-2xl">
+                          <iframe
+                            src={currentArticle.videoUrl.replace(
+                              "watch?v=",
+                              "embed/",
+                            )}
+                            className="w-full h-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        </div>
+                      )}
 
                       <div className="prose prose-invert max-w-none">
                         {currentArticle.content?.includes(

@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/table";
 import {
   Inbox,
-  Database,
   BarChart3,
   ShieldCheck,
   Zap,
@@ -34,15 +33,32 @@ import {
   ChevronDown,
   Download,
 } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
-import { cn } from "@/lib/utils";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+} from "recharts";
+import { cn, formatCurrency } from "@/lib/utils";
 import { TransactionModal } from "../transaction-modal";
-import { deleteTransaction } from "@/lib/actions";
+import { deleteTransaction, upsertBudget } from "@/lib/actions";
 import { toast } from "sonner";
 import { EmptyState } from "../empty-state";
-import { useState, useEffect, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useOptimistic,
+  useTransition,
+} from "react";
+
 import { useRouter, useSearchParams } from "next/navigation";
-import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 
 import {
   AlertDialog,
@@ -72,8 +88,8 @@ import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 
 interface ExpenseTabContentProps {
   dataPengeluaran: any[];
-  totalPenting: number;
-  totalSekunder: number;
+  totalKebutuhan: number;
+  totalKeinginan: number;
   recentTransactions?: any[];
   categories?: any[];
   pagination?: {
@@ -82,15 +98,21 @@ interface ExpenseTabContentProps {
     totalTransactions: number;
     pageSize: number;
   };
+  currency?: string;
+  monthlyIncome?: number;
+  currentBalance?: number;
 }
 
 export function ExpenseTabContent({
   dataPengeluaran,
-  totalPenting,
-  totalSekunder,
+  totalKebutuhan,
+  totalKeinginan,
   recentTransactions = [],
   categories = [],
   pagination,
+  currency = "IDR",
+  monthlyIncome = 0,
+  currentBalance = 0,
 }: ExpenseTabContentProps) {
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -98,18 +120,28 @@ export function ExpenseTabContent({
   const [transactionToDelete, setTransactionToDelete] = useState<number | null>(
     null,
   );
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Optimistic UI for transactions
+  const [optimisticTransactions, addOptimisticTransaction] = useOptimistic(
+    recentTransactions,
+    (state, id: number) => state.filter((t) => t.id !== id),
+  );
+
   const currentRange = searchParams.get("range") || "monthly";
   const currentSearch = searchParams.get("search") || "";
   const currentCategory = searchParams.get("category") || "all";
 
   const [searchValue, setSearchValue] = useState(currentSearch);
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Sync internal search state with URL when URL changes externally
   useEffect(() => {
     setSearchValue(currentSearch);
+    setIsMounted(true);
   }, [currentSearch]);
 
   const updateFilters = useCallback(
@@ -124,19 +156,91 @@ export function ExpenseTabContent({
       });
       // Always reset to page 1 when filtering
       params.set("page", "1");
-      router.push(`?${params.toString()}`);
+      router.push(`?${params.toString()}`, { scroll: false });
     },
     [router, searchParams],
   );
 
   const handleSearch = (val: string) => {
     setSearchValue(val);
-    // Debounce logic could be added here, or just wait for enter/blur
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateFilters({ search: searchValue });
+  };
+
+  const handleGeneratePlan = async () => {
+    setIsGeneratingPlan(true);
+    const toastId = toast.loading(
+      "AI sedang menganalisis pola pengeluaran & pendapatan...",
+    );
+
+    try {
+      // 1. Simulasi analisis AI (memberikan kesan 'berpikir' yang lebih premium)
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      // 2. Persiapan Data & Algoritma 50/30/20
+      const income = monthlyIncome || 3000000; // Fallback ke standar UMR jika data 0
+      const targetNeeds = income * 0.5;
+      const targetWants = income * 0.3;
+
+      const currentNeedsTotal = dataPengeluaran
+        .filter((i) => i.priority === "Kebutuhan")
+        .reduce((acc, curr) => acc + curr.value, 0);
+
+      const currentWantsTotal = dataPengeluaran
+        .filter((i) => i.priority === "Keinginan")
+        .reduce((acc, curr) => acc + curr.value, 0);
+
+      // 3. Kalkulasi Budget per Kategori
+      const promises = dataPengeluaran.map(async (item) => {
+        let suggestedBudget = item.value;
+
+        if (item.priority === "Kebutuhan") {
+          // Target Ideal: 50%
+          const needsRatio = currentNeedsTotal / income;
+          const factor = needsRatio > 0.5 ? 0.95 : 1.1;
+          suggestedBudget = item.value > 0 ? item.value * factor : income * 0.1;
+        } else if (item.priority === "Keinginan") {
+          // Target Ideal: 30%
+          const wantsRatio = currentWantsTotal / income;
+          const factor = wantsRatio > 0.3 ? 0.75 : 0.85;
+          suggestedBudget = item.value > 0 ? item.value * factor : 0;
+        }
+
+        // Round to nearest 25.000 untuk presisi yang lebih humanis
+        suggestedBudget = Math.round(suggestedBudget / 25000) * 25000;
+
+        // Pastikan tidak nol jika itu kebutuhan penting
+        if (item.priority === "Kebutuhan" && suggestedBudget === 0) {
+          suggestedBudget = 100000;
+        }
+
+        if (item.id) {
+          return upsertBudget(item.id, suggestedBudget);
+        }
+      });
+
+      await Promise.all(promises);
+
+      toast.success("Rencana Hemat AI Siap!", {
+        id: toastId,
+        description:
+          "Anggaran telah dioptimalkan berdasarkan prinsip 50/30/20.",
+      });
+
+      // 4. Navigasi ke tab anggaran untuk review
+      startTransition(() => {
+        router.push(`/dashboard?range=${currentRange}&tab=anggaran`, {
+          scroll: false,
+        });
+      });
+    } catch (error) {
+      toast.error("Gagal menjalankan algoritma AI", { id: toastId });
+    } finally {
+      setIsGeneratingPlan(false);
+    }
   };
 
   const handleCategoryChange = (catName: string) => {
@@ -145,21 +249,25 @@ export function ExpenseTabContent({
 
   const handleDeleteTransaction = async () => {
     if (transactionToDelete) {
-      setIsDeleting(true);
-      try {
-        await deleteTransaction(transactionToDelete);
-        toast.success("Transaksi berhasil dihapus", {
-          description: "Saldo Anda telah diperbarui secara otomatis.",
-        });
+      // Perform the actual deletion in a transition
+      startTransition(async () => {
+        // 1. Instantly update UI optimistically
+        addOptimisticTransaction(transactionToDelete);
         setIsDeleteOpen(false);
-        setTransactionToDelete(null);
-      } catch (error) {
-        toast.error("Gagal menghapus transaksi", {
-          description: "Terjadi kesalahan saat menghapus data.",
-        });
-      } finally {
-        setIsDeleting(false);
-      }
+
+        try {
+          await deleteTransaction(transactionToDelete);
+          toast.success("Transaksi berhasil dihapus", {
+            description: "Saldo Anda telah diperbarui secara otomatis.",
+          });
+          setTransactionToDelete(null);
+        } catch (error) {
+          toast.error("Gagal menghapus transaksi", {
+            description:
+              "Terjadi kesalahan saat menghapus data. Mencoba memulihkan...",
+          });
+        }
+      });
     }
   };
 
@@ -201,10 +309,10 @@ export function ExpenseTabContent({
                   </Tooltip>
                   <div>
                     <p className="text-xs text-muted-foreground font-medium uppercase">
-                      Kebutuhan Penting
+                      Alokasi Kebutuhan
                     </p>
                     <p className="text-xl font-bold">
-                      Rp {totalPenting.toLocaleString("id-ID")}
+                      Rp {totalKebutuhan.toLocaleString("id-ID")}
                     </p>
                   </div>
                 </div>
@@ -217,19 +325,22 @@ export function ExpenseTabContent({
               </div>
               <ScrollArea className="h-[120px] pr-4">
                 <div className="grid gap-2">
-                  {dataPengeluaran.filter((d) => d.priority === "Penting")
+                  {dataPengeluaran.filter((d) => d.priority === "Kebutuhan")
                     .length > 0 ? (
                     dataPengeluaran
-                      .filter((d) => d.priority === "Penting")
+                      .filter((d) => d.priority === "Kebutuhan")
                       .map((item) => (
                         <div
                           key={item.name}
-                          className="flex items-center justify-between text-sm px-2 py-1 hover:bg-white/5 rounded-lg transition-colors"
+                          className="flex items-center justify-between text-sm px-2 py-1 hover:bg-white/5 rounded-lg transition-colors group"
                         >
-                          <span className="text-muted-foreground">
+                          <span
+                            className="font-medium transition-colors"
+                            style={{ color: item.color || "inherit" }}
+                          >
                             {item.name}
                           </span>
-                          <span className="font-semibold">
+                          <span className="font-semibold text-foreground/90">
                             Rp {item.value.toLocaleString("id-ID")}
                           </span>
                         </div>
@@ -256,10 +367,10 @@ export function ExpenseTabContent({
                   </Tooltip>
                   <div>
                     <p className="text-xs text-muted-foreground font-medium uppercase">
-                      Kebutuhan Sekunder
+                      Alokasi Keinginan
                     </p>
                     <p className="text-xl font-bold">
-                      Rp {totalSekunder.toLocaleString("id-ID")}
+                      Rp {totalKeinginan.toLocaleString("id-ID")}
                     </p>
                   </div>
                 </div>
@@ -272,19 +383,22 @@ export function ExpenseTabContent({
               </div>
               <ScrollArea className="h-[120px] pr-4">
                 <div className="grid gap-2">
-                  {dataPengeluaran.filter((d) => d.priority === "Sekunder")
+                  {dataPengeluaran.filter((d) => d.priority === "Keinginan")
                     .length > 0 ? (
                     dataPengeluaran
-                      .filter((d) => d.priority === "Sekunder")
+                      .filter((d) => d.priority === "Keinginan")
                       .map((item) => (
                         <div
                           key={item.name}
-                          className="flex items-center justify-between text-sm px-2 py-1 hover:bg-white/5 rounded-lg transition-colors"
+                          className="flex items-center justify-between text-sm px-2 py-1 hover:bg-white/5 rounded-lg transition-colors group"
                         >
-                          <span className="text-muted-foreground">
+                          <span
+                            className="font-medium transition-colors"
+                            style={{ color: item.color || "inherit" }}
+                          >
                             {item.name}
                           </span>
-                          <span className="font-semibold">
+                          <span className="font-semibold text-foreground/90">
                             Rp {item.value.toLocaleString("id-ID")}
                           </span>
                         </div>
@@ -305,8 +419,13 @@ export function ExpenseTabContent({
             <CardDescription>Persentase pengeluaran.</CardDescription>
           </CardHeader>
           <CardContent className="h-[240px] min-h-[240px] flex items-center justify-center relative">
-            {dataPengeluaran.some((d) => d.value > 0) ? (
-              <ResponsiveContainer width="100%" height="100%" debounce={100}>
+            {isMounted && dataPengeluaran.some((d) => d.value > 0) ? (
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                debounce={100}
+                minWidth={0}
+              >
                 <PieChart>
                   <Pie
                     data={dataPengeluaran}
@@ -322,12 +441,36 @@ export function ExpenseTabContent({
                     ))}
                   </Pie>
                   <RechartsTooltip
-                    contentStyle={{
-                      backgroundColor: "rgba(26, 26, 29, 0.8)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: "12px",
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-background/90 backdrop-blur-xl border border-white/10 p-3 rounded-2xl shadow-2xl animate-in zoom-in duration-200">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="size-3 rounded-full shadow-lg shadow-white/5"
+                                style={{ backgroundColor: data.color }}
+                              />
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-0.5">
+                                  {data.priority}
+                                </span>
+                                <span
+                                  className="text-sm font-bold"
+                                  style={{ color: data.color }}
+                                >
+                                  {data.name}
+                                </span>
+                                <span className="text-xs font-medium text-white/90">
+                                  Rp {data.value.toLocaleString("id-ID")}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
                     }}
-                    itemStyle={{ color: "#fff" }}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -351,25 +494,26 @@ export function ExpenseTabContent({
               <CardTitle className="text-xl font-black tracking-tight">
                 Detail Transaksi
               </CardTitle>
-              <CardDescription className="font-medium text-muted-foreground/85">
+              <CardDescription className="font-medium text-muted-foreground">
                 Daftar lengkap belanja Anda.
               </CardDescription>
             </div>
 
             {/* Premium Filter Bar */}
             <div className="flex flex-col md:flex-row gap-3 pt-2">
-              <form
-                onSubmit={handleSearchSubmit}
-                className="relative flex-1 group"
-              >
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                <Input
-                  placeholder="Cari transaksi..."
-                  value={searchValue}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="pl-10 h-10 text-xs bg-white/2 border-white/5 rounded-xl focus:bg-white/4 focus:border-primary/20 transition-all placeholder:text-muted-foreground/60"
-                  aria-label="Cari transaksi"
-                />
+              <form onSubmit={handleSearchSubmit} className="flex-1">
+                <InputGroup className="bg-white/2 border-white/5 rounded-xl h-10 focus-within:ring-primary/20 focus-within:bg-white/4 focus-within:border-primary/20 transition-all">
+                  <InputGroupAddon>
+                    <Search className="size-4 text-muted-foreground group-focus-within/input-group:text-primary transition-colors" />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    placeholder="Cari transaksi..."
+                    value={searchValue}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    className="text-xs placeholder:text-muted-foreground/90"
+                    aria-label="Cari transaksi"
+                  />
+                </InputGroup>
               </form>
 
               <div className="flex gap-2">
@@ -387,7 +531,7 @@ export function ExpenseTabContent({
                             : currentCategory}
                         </span>
                       </div>
-                      <ChevronDown className="size-3.5 text-muted-foreground/40" />
+                      <ChevronDown className="size-3.5 text-muted-foreground/75" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -454,28 +598,25 @@ export function ExpenseTabContent({
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent border-muted/30">
-                  <TableHead className="w-[120px] text-[10px] font-black uppercase tracking-widest text-muted-foreground/80 py-4 pl-6">
-                    Tanggal
-                  </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80 py-4">
-                    Keterangan
-                  </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80 py-4">
-                    Kategori
-                  </TableHead>
-                  <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground/80 py-4">
-                    Jumlah
-                  </TableHead>
-                  <TableHead className="w-[50px] py-4"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentTransactions.length > 0 ? (
-                  recentTransactions.map((row, i) => (
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table className="w-full">
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent border-muted/30">
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4 pl-6">
+                      Tanggal
+                    </TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4">
+                      Keterangan & Kategori
+                    </TableHead>
+                    <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground py-4 pr-6">
+                      Jumlah
+                    </TableHead>
+                    <TableHead className="w-[50px] py-4"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {optimisticTransactions.map((row, i) => (
                     <TableRow
                       key={i}
                       onClick={() => handleRowClick(row)}
@@ -487,75 +628,101 @@ export function ExpenseTabContent({
                           month: "short",
                         })}
                       </TableCell>
-                      <TableCell className="font-medium">
-                        {row.description || row.store}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <Badge
-                            variant="secondary"
-                            className="w-fit font-normal bg-muted/40"
-                          >
-                            {row.category?.name || "Lainnya"}
-                          </Badge>
-                          {row.type === "expense" && row.category?.priority && (
-                            <span
-                              className={cn(
-                                "text-[8px] font-black uppercase tracking-widest ml-1",
-                                row.category.priority === "Penting"
-                                  ? "text-rose-500"
-                                  : "text-amber-500",
-                              )}
+                      <TableCell className="py-4 pl-6">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="font-bold text-sm text-white tracking-tight">
+                            {row.description || row.store}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[10px] font-bold"
+                              style={{
+                                backgroundColor: row.category?.color
+                                  ? `${row.category.color}10`
+                                  : undefined,
+                                color: row.category?.color || undefined,
+                                borderColor: row.category?.color
+                                  ? `${row.category.color}25`
+                                  : undefined,
+                              }}
                             >
-                              {row.category.priority === "Penting"
-                                ? "Kebutuhan"
-                                : "Keinginan"}
-                            </span>
-                          )}
+                              {row.category?.name || "Lainnya"}
+                            </div>
+                            {row.type === "expense" &&
+                              row.category?.priority && (
+                                <>
+                                  <div className="size-1 rounded-full bg-white/10" />
+                                  <span
+                                    className={cn(
+                                      "text-[9px] font-black uppercase tracking-widest opacity-40",
+                                      row.category.priority === "Kebutuhan"
+                                        ? "text-rose-500"
+                                        : "text-amber-500",
+                                    )}
+                                  >
+                                    {row.category.priority}
+                                  </span>
+                                </>
+                              )}
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell
-                        className={cn(
-                          "text-right font-mono font-bold",
-                          row.type === "income"
-                            ? "text-emerald-500"
-                            : "text-rose-500",
-                        )}
-                      >
-                        {row.type === "income" ? "+" : "-"}Rp{" "}
-                        {row.amount.toLocaleString("id-ID")}
+                      <TableCell className="text-right py-4 pr-6">
+                        <div className="flex flex-col items-end gap-1">
+                          <span
+                            className={cn(
+                              "font-mono font-bold text-base",
+                              row.type === "income"
+                                ? "text-emerald-500"
+                                : "text-rose-500",
+                            )}
+                          >
+                            {row.type === "income" ? "+" : "-"}Rp{" "}
+                            {row.amount.toLocaleString("id-ID")}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/30 font-bold uppercase tracking-widest">
+                            {row.type === "income"
+                              ? "Pemasukan"
+                              : "Pengeluaran"}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right pr-6">
                         <DropdownMenu>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenuTrigger
+                                asChild
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  aria-label="Opsi transaksi"
                                   className="size-8 rounded-lg hover:bg-white/10 transition-colors"
                                 >
                                   <MoreVertical className="size-4 text-muted-foreground" />
                                 </Button>
                               </DropdownMenuTrigger>
                             </TooltipTrigger>
-                            <TooltipContent>
-                              Opsi Transaksi
-                            </TooltipContent>
+                            <TooltipContent>Opsi Transaksi</TooltipContent>
                           </Tooltip>
-                          <DropdownMenuContent align="end" className="w-40 bg-background/80 backdrop-blur-2xl border-white/10 rounded-xl p-1.5 shadow-2xl">
-                            <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 px-2 py-1.5">
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-40 bg-background/80 backdrop-blur-2xl border-white/10 rounded-xl p-1.5 shadow-2xl"
+                          >
+                            <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/90 px-2 py-1.5">
                               Aksi
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-white/5" />
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleRowClick(row)}
                               className="rounded-lg text-xs font-bold py-2 gap-2 focus:bg-primary/10 focus:text-primary transition-colors cursor-pointer"
                             >
                               <Pencil className="size-3.5" />
                               Ubah
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={(e) => openDeleteDialog(e, row.id)}
                               className="rounded-lg text-xs font-bold py-2 gap-2 focus:bg-rose-500/10 focus:text-rose-500 transition-colors cursor-pointer"
                             >
@@ -566,23 +733,20 @@ export function ExpenseTabContent({
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="h-[300px] text-center pointer-events-none"
-                    >
-                      <EmptyState
-                        icon={Inbox}
-                        title="Belum ada transaksi"
-                        description="Mulai catat pengeluaran Anda hari ini untuk melacak kesehatan finansial."
-                      />
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {optimisticTransactions.length === 0 && (
+              <div className="py-24 flex flex-col items-center justify-center w-full">
+                <EmptyState
+                  icon={Inbox}
+                  title="Belum ada transaksi"
+                  description="Mulai catat pengeluaran Anda hari ini untuk melacak kesehatan finansial."
+                />
+              </div>
+            )}
 
             {/* Premium Pagination Controls */}
             {pagination && pagination.totalPages > 1 && (
@@ -606,7 +770,7 @@ export function ExpenseTabContent({
                         "page",
                         (pagination.currentPage - 1).toString(),
                       );
-                      router.push(`?${params.toString()}`);
+                      router.push(`?${params.toString()}`, { scroll: false });
                     }}
                     className="h-8 w-8 p-0 rounded-lg border-white/10 bg-transparent hover:bg-white/5 disabled:opacity-30"
                     aria-label="Halaman Sebelumnya"
@@ -625,9 +789,10 @@ export function ExpenseTabContent({
                         "page",
                         (pagination.currentPage + 1).toString(),
                       );
-                      router.push(`?${params.toString()}`);
+                      router.push(`?${params.toString()}`, { scroll: false });
                     }}
                     className="h-8 w-8 p-0 rounded-lg border-white/10 bg-transparent hover:bg-white/5 disabled:opacity-30"
+                    aria-label="Halaman Berikutnya"
                   >
                     <ChevronRight className="size-4" />
                   </Button>
@@ -669,10 +834,10 @@ export function ExpenseTabContent({
                   </AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDeleteTransaction}
-                    disabled={isDeleting}
+                    disabled={isPending}
                     className="flex-1 rounded-2xl h-12 bg-rose-500 hover:bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-rose-500/20 m-0"
                   >
-                    {isDeleting ? "Menghapus..." : "Ya, Hapus"}
+                    {isPending ? "Menghapus..." : "Ya, Hapus"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -690,30 +855,81 @@ export function ExpenseTabContent({
               <Zap className="size-5 text-primary" />
               Tips Hemat
             </CardTitle>
-            <CardDescription>Saran untuk kebutuhan sekunder.</CardDescription>
+            <CardDescription>
+              Saran untuk mengoptimalkan pengeluaran.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 relative z-10">
-            {totalSekunder > 0 ? (
+            {totalKeinginan > 0 ? (
               <>
-                <div className="p-3 rounded-xl bg-background/50 border border-border/50 text-sm">
-                  <p className="font-bold text-primary mb-1">
-                    Analisis Kebutuhan
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Pengeluaran sekunder Anda mencapai Rp{" "}
-                    {totalSekunder.toLocaleString("id-ID")}. Coba evaluasi
-                    kembali item non-esensial untuk menambah tabungan.
-                  </p>
-                </div>
-                <div className="p-3 rounded-xl bg-background/50 border border-border/50 text-sm">
-                  <p className="font-bold text-primary mb-1">
-                    Prinsip 50/30/20
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Pastikan alokasi keinginan tidak melebihi 30% dari total
-                    saldo Anda.
-                  </p>
-                </div>
+                {(() => {
+                  const income = monthlyIncome || 3000000;
+                  const idealWants = income * 0.3;
+                  const overspent = totalKeinginan - idealWants;
+
+                  const topWants = [...dataPengeluaran]
+                    .filter((i) => i.priority === "Keinginan")
+                    .sort((a, b) => b.value - a.value)[0];
+
+                  return (
+                    <>
+                      <div className="p-3 rounded-xl bg-background/50 border border-border/50 text-sm animate-in fade-in slide-in-from-right duration-500">
+                        <p className="font-bold text-primary mb-1 flex items-center gap-2">
+                          <TrendingDown className="size-3" />
+                          Analisis Pengeluaran
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {overspent > 0 ? (
+                            <>
+                              Pengeluaran{" "}
+                              <span className="text-rose-500 font-bold">
+                                Keinginan
+                              </span>{" "}
+                              Anda sudah melebihi batas ideal sebesar{" "}
+                              <span className="text-foreground font-bold">
+                                Rp {overspent.toLocaleString("id-ID")}
+                              </span>
+                              .
+                              {topWants && (
+                                <span>
+                                  {" "}
+                                  Alokasi terbesar ada pada kategori{" "}
+                                  <span className="text-primary font-bold">
+                                    {topWants.name}
+                                  </span>
+                                  .
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              Bagus! Pengeluaran{" "}
+                              <span className="text-emerald-500 font-bold">
+                                Keinginan
+                              </span>{" "}
+                              Anda masih di bawah batas ideal 30%. Anda memiliki
+                              sisa ruang{" "}
+                              <span className="text-foreground font-bold">
+                                Rp {Math.abs(overspent).toLocaleString("id-ID")}
+                              </span>{" "}
+                              untuk ditabung.
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <div className="p-3 rounded-xl bg-background/50 border border-border/50 text-sm animate-in fade-in slide-in-from-right duration-700">
+                        <p className="font-bold text-primary mb-1">
+                          Strategi AI
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {overspent > 0
+                            ? `Gunakan "Rencana Hemat" untuk memangkas pengeluaran non-esensial secara otomatis agar dana darurat Anda tetap terjaga.`
+                            : `Pertahankan pola ini dan alokasikan sisa dana ke instrumen investasi untuk pertumbuhan aset jangka panjang.`}
+                        </p>
+                      </div>
+                    </>
+                  );
+                })()}
               </>
             ) : (
               <div className="p-4 text-center">
@@ -728,31 +944,19 @@ export function ExpenseTabContent({
             <Button
               className={cn(
                 "w-full rounded-xl font-bold shadow-lg transition-all active:scale-95",
-                totalSekunder > 0
+                totalKeinginan > 0
                   ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20"
                   : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20",
               )}
-              onClick={() => {
-                if (totalSekunder > 0) {
-                  toast.success("AI Menganalisis Pola Hemat...", {
-                    description:
-                      "Rencana penghematan sedang disiapkan berdasarkan riwayat transaksi Anda.",
-                  });
-                  // Optionally navigate to budget tab to set limits
-                  router.push(`/dashboard?range=${currentRange}&tab=anggaran`);
-                } else {
-                  router.push(`/dashboard?range=${currentRange}&tab=anggaran`);
-                  toast.info("Mari atur target baru!", {
-                    description:
-                      "Pertahankan kondisi sehat dengan mengatur limit anggaran bulanan.",
-                  });
-                }
-              }}
+              onClick={handleGeneratePlan}
+              disabled={isGeneratingPlan}
             >
-              {totalSekunder > 0
-                ? "Buat Rencana Hemat"
-                : "Atur Target Anggaran"}
-              <ArrowRight className="size-4 ml-2" />
+              {isGeneratingPlan
+                ? "Menganalisis..."
+                : totalKeinginan > 0
+                  ? "Buat Rencana Hemat"
+                  : "Atur Target Baru"}
+              {!isGeneratingPlan && <ArrowRight className="ml-2 size-4" />}
             </Button>
           </CardContent>
         </Card>

@@ -5,36 +5,23 @@ import * as schema from "../db/schema";
 import { eq, and, desc, sql, or, like, SQL } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-const CURRENT_USER_ID = "user_1";
-
+import { getUserId } from "../session";
 import { getUser } from "./dashboard.actions";
+import { savingGoalSchema, savingContributionSchema } from "../validations";
 
-export async function addSavingGoal(formData: {
-  name: string;
-  targetAmount: number;
-  currentAmount?: number;
-  iconName?: string;
-  color?: string;
-  dueDate?: string;
-}) {
+export async function addSavingGoal(data: any) {
+  const validatedData = savingGoalSchema.parse(data);
+  const formData = validatedData;
   await db.insert(schema.savingsGoals).values({
     ...formData,
-    userId: CURRENT_USER_ID,
+    userId: await getUserId(),
   });
   revalidatePath("/dashboard", "layout");
 }
 
-export async function updateSavingGoal(
-  id: number,
-  formData: Partial<{
-    name: string;
-    targetAmount: number;
-    currentAmount: number;
-    iconName: string;
-    color: string;
-    dueDate: string;
-  }>
-) {
+export async function updateSavingGoal(id: number, data: any) {
+  const validatedData = savingGoalSchema.partial().parse(data);
+  const formData = validatedData;
   await db.update(schema.savingsGoals).set({
     ...formData,
   }).where(eq(schema.savingsGoals.id, id));
@@ -54,6 +41,7 @@ export async function deleteSavingGoal(id: number) {
 }
 
 export async function addSavingContribution(id: number, amount: number) {
+  savingContributionSchema.parse({ goalId: id, amount });
   const goal = await db.query.savingsGoals.findFirst({
     where: eq(schema.savingsGoals.id, id),
   });
@@ -79,7 +67,7 @@ export async function addSavingContribution(id: number, amount: number) {
         name: "Tabungan",
         type: "expense",
         icon: "TrendingUp",
-        priority: "Sekunder",
+        priority: "Kebutuhan",
         color: "#10b981",
       })
       .returning();
@@ -93,7 +81,7 @@ export async function addSavingContribution(id: number, amount: number) {
     description: `Menabung untuk: ${goal.name}`,
     store: "SakuKu Savings",
     date: new Date().toLocaleDateString("en-CA"),
-    userId: CURRENT_USER_ID,
+    userId: await getUserId(),
     goalId: goal.id,
   });
 
@@ -103,7 +91,7 @@ export async function addSavingContribution(id: number, amount: number) {
     await db
       .update(schema.users)
       .set({ balance: (user.balance ?? 0) - amount })
-      .where(eq(schema.users.id, CURRENT_USER_ID));
+      .where(eq(schema.users.id, await getUserId()));
   }
 
   revalidatePath("/dashboard", "layout");

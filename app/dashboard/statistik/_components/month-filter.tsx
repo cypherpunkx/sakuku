@@ -20,7 +20,7 @@ export function MonthFilter({ currentMonth }: MonthFilterProps) {
     const monthStr = format(newDate, "yyyy-MM");
     const params = new URLSearchParams(searchParams.toString());
     params.set("month", monthStr);
-    router.push(`/dashboard/statistik?${params.toString()}`);
+    router.push(`/dashboard/statistik?${params.toString()}`, { scroll: false });
   };
 
   const prevMonth = () => handleMonthChange(subMonths(date, 1));
@@ -32,6 +32,7 @@ export function MonthFilter({ currentMonth }: MonthFilterProps) {
         variant="ghost"
         size="icon"
         onClick={prevMonth}
+        aria-label="Bulan sebelumnya"
         className="rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300"
       >
         <ChevronLeft className="size-4" />
@@ -48,6 +49,7 @@ export function MonthFilter({ currentMonth }: MonthFilterProps) {
         variant="ghost"
         size="icon"
         onClick={nextMonth}
+        aria-label="Bulan berikutnya"
         className="rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300"
       >
         <ChevronRight className="size-4" />

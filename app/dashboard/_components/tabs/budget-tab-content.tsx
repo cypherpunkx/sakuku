@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { upsertBudget, resetBudgets } from "@/lib/actions";
 import { EmptyState } from "../empty-state";
 import {
@@ -52,7 +53,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 const ICON_MAP: Record<string, any> = {
   Utensils,
@@ -77,30 +78,68 @@ const ICON_MAP: Record<string, any> = {
 };
 
 interface BudgetTabContentProps {
-  initialBudgets?: any[];
-  allCategories?: any[];
-  monthlyIncome?: number;
-  totalMonthlyExpenses?: number;
+  initialBudgets: any[];
+  allCategories: any[];
+  monthlyIncome: number;
+  totalMonthlyExpenses: number;
+  currency?: string;
 }
 
 export function BudgetTabContent({
-  initialBudgets = [],
-  allCategories = [],
-  monthlyIncome = 0,
-  totalMonthlyExpenses = 0,
+  initialBudgets,
+  allCategories,
+  monthlyIncome,
+  totalMonthlyExpenses,
+  currency = "IDR",
 }: BudgetTabContentProps) {
+  const router = useRouter();
   const [budgetValues, setBudgetValues] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Initialize budget values
+  const DRAFT_KEY = "sakuku_budget_draft";
+
+  // Initialize budget values (only once on mount or when initialBudgets change)
   useEffect(() => {
+    if (isInitialized) return;
+
     const initialValues: Record<number, number> = {};
     initialBudgets.forEach((b) => {
       if (b.categoryId) initialValues[b.categoryId] = b.amountLimit;
     });
-    setBudgetValues(initialValues);
-  }, [initialBudgets]);
+
+    // Check for draft in sessionStorage
+    try {
+      const draft = sessionStorage.getItem(DRAFT_KEY);
+      if (draft) {
+        const parsedDraft = JSON.parse(draft);
+        // Merge draft with initial values (draft takes priority)
+        setBudgetValues({ ...initialValues, ...parsedDraft });
+        toast.info("Draft anggaran dipulihkan", {
+          description: "Perubahan yang belum disimpan telah dimuat kembali.",
+          duration: 3000,
+        });
+      } else {
+        setBudgetValues(initialValues);
+      }
+    } catch (e) {
+      setBudgetValues(initialValues);
+    }
+    
+    setIsInitialized(true);
+  }, [initialBudgets, isInitialized]);
+
+  // Save draft to sessionStorage whenever values change
+  useEffect(() => {
+    if (!isInitialized || Object.keys(budgetValues).length === 0) return;
+    
+    const timeoutId = setTimeout(() => {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(budgetValues));
+    }, 500); // Debounce save
+
+    return () => clearTimeout(timeoutId);
+  }, [budgetValues, isInitialized]);
 
   const expenseCategories = allCategories.filter(
     (cat) => cat.type === "expense",
@@ -113,7 +152,9 @@ export function BudgetTabContent({
         upsertBudget(Number(catId), amount),
       );
       await Promise.all(promises);
+      sessionStorage.removeItem(DRAFT_KEY);
       toast.success("Anggaran berhasil disimpan!");
+      router.refresh(); // Refresh to get updated server data
     } catch (error) {
       toast.error("Gagal menyimpan anggaran");
     } finally {
@@ -126,8 +167,10 @@ export function BudgetTabContent({
     try {
       await resetBudgets();
       setBudgetValues({});
+      sessionStorage.removeItem(DRAFT_KEY);
       toast.success("Anggaran berhasil direset!");
       setIsResetDialogOpen(false);
+      router.refresh();
     } catch (error) {
       toast.error("Gagal mereset anggaran");
     } finally {
@@ -333,14 +376,14 @@ export function BudgetTabContent({
                   </div>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground/60">
-                      RP
+                      {currency === "USD" ? "$" : "Rp"}
                     </span>
                     <Input
                       type="text"
-                      value={amountLimit.toLocaleString("id-ID")}
+                      value={amountLimit.toLocaleString(currency === "USD" ? "en-US" : "id-ID")}
                       onChange={(e) => {
                         const val =
-                          parseInt(e.target.value.replace(/\./g, "")) || 0;
+                          parseInt(e.target.value.replace(/[,.]/g, "")) || 0;
                         updateBudgetValue(cat.id, val);
                       }}
                       className="w-36 pl-8 h-10 bg-background/50 border-border/50 rounded-xl font-mono font-black text-right focus-visible:ring-primary/20"
@@ -354,8 +397,7 @@ export function BudgetTabContent({
                       Pemakaian {usage.toFixed(0)}%
                     </span>
                     <span className="text-[10px] font-black text-muted-foreground/60">
-                      Rp {spent.toLocaleString("id-ID")} / Rp{" "}
-                      {amountLimit.toLocaleString("id-ID")}
+                      {formatCurrency(spent, currency)} / {formatCurrency(amountLimit, currency)}
                     </span>
                   </div>
                   <Slider
@@ -401,8 +443,9 @@ export function BudgetTabContent({
                 const amountLimit = budgetValues[cat.id] || 0;
                 const spent = budget?.spent || 0;
                 const spentRatio = amountLimit > 0 ? spent / amountLimit : 0;
-                const isWarning = spentRatio > 0.8;
-                const isDanger = spentRatio > 0.95 && spentRatio <= 1;
+                const isWarning = spentRatio > 0.85 && spentRatio < 0.95;
+                const isDanger = spentRatio >= 0.95 && spentRatio < 1;
+                const isFull = spentRatio === 1;
                 const isOver = spentRatio > 1;
 
                 const remaining = amountLimit - spent;
@@ -419,31 +462,36 @@ export function BudgetTabContent({
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {(isWarning || isOver) && (
+                        {(isWarning || isDanger || isOver) && (
                           <Badge
                             variant="outline"
                             className={cn(
                               "text-[8px] font-black py-0 px-1.5 animate-pulse h-5 uppercase tracking-widest",
-                              isOver || isDanger
+                              isOver || isFull
                                 ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
                                 : "bg-amber-500/10 text-amber-500 border-amber-500/20",
                             )}
                           >
                             {isOver 
                               ? "Terlampaui!" 
-                              : isDanger 
-                                ? "Hampir Habis!" 
-                                : "Waspada!"}
+                              : isFull
+                                ? "Habis!"
+                                : isDanger 
+                                  ? "Hampir Habis!" 
+                                  : "Waspada!"}
                           </Badge>
                         )}
-                        <span className="font-black text-lg">
+                        <span className={cn(
+                          "font-black text-lg transition-colors duration-500",
+                          (isOver || isFull) ? "text-rose-500" : (isWarning || isDanger) ? "text-amber-500" : "text-foreground"
+                        )}>
                           {isOver ? (
-                            <span className="text-rose-500">
-                              Over Rp {Math.abs(remaining).toLocaleString("id-ID")}
-                            </span>
+                            <>
+                              Over {formatCurrency(Math.abs(remaining), currency)}
+                            </>
                           ) : (
                             <>
-                              Rp {remaining.toLocaleString("id-ID")}{" "}
+                              {formatCurrency(remaining, currency)}{" "}
                               <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">
                                 tersisa
                               </span>
@@ -457,17 +505,17 @@ export function BudgetTabContent({
                       className="h-3 bg-muted/20 rounded-full"
                       indicatorClassName={cn(
                         "rounded-full transition-all duration-1000",
-                        isDanger
+                        (isOver || isFull)
                           ? "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.4)]"
-                          : isWarning
+                          : (isWarning || isDanger)
                             ? "bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.4)]"
                             : "bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.4)]",
                       )}
                     />
                     <div className="flex justify-between text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-60">
-                      <span>Terpakai: Rp {spent.toLocaleString("id-ID")}</span>
+                      <span>Terpakai: {formatCurrency(spent, currency)}</span>
                       <span>
-                        Limit: Rp {amountLimit.toLocaleString("id-ID")}
+                        Limit: {formatCurrency(amountLimit, currency)}
                       </span>
                     </div>
                   </div>
@@ -536,12 +584,7 @@ export function BudgetTabContent({
             </div>
             <Button
               variant="outline"
-              onClick={() =>
-                toast.info("Laporan lengkap sedang disiapkan", {
-                  description:
-                    "Anda akan dialihkan ke halaman analisis dalam beberapa saat.",
-                })
-              }
+              onClick={() => router.push("/dashboard/statistik")}
               className={cn(
                 "w-full rounded-xl font-bold",
                 isSafe

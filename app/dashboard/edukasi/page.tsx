@@ -3,6 +3,12 @@ import { LearningTabContent } from "../_components/tabs/learning-tab-content";
 import { BookOpen } from "lucide-react";
 import { LearningSearch } from "./_components/learning-search";
 import { Suspense } from "react";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Edukasi Finansial",
+  description: "Tingkatkan literasi keuangan Anda dengan artikel dan tips cerdas dari SakuKu.",
+};
 
 export default async function EdukasiPage({
   searchParams,

@@ -5,9 +5,12 @@ import * as schema from "../db/schema";
 import { eq, and, desc, sql, or, like, SQL } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-const CURRENT_USER_ID = "user_1";
+import { getUserId } from "../session";
+
+import { budgetSchema } from "../validations";
 
 export async function upsertBudget(categoryId: number, amountLimit: number) {
+  budgetSchema.parse({ categoryId, amount: amountLimit });
   const currentMonth = new Date().toLocaleDateString("en-CA").slice(0, 7); // YYYY-MM
 
   // Check if budget already exists for this category and period
@@ -15,7 +18,7 @@ export async function upsertBudget(categoryId: number, amountLimit: number) {
     where: and(
       eq(schema.budgets.categoryId, categoryId),
       eq(schema.budgets.period, currentMonth),
-      eq(schema.budgets.userId, CURRENT_USER_ID),
+      eq(schema.budgets.userId, await getUserId()),
     ),
   });
 
@@ -29,7 +32,7 @@ export async function upsertBudget(categoryId: number, amountLimit: number) {
       categoryId,
       amountLimit,
       period: currentMonth,
-      userId: CURRENT_USER_ID,
+      userId: await getUserId(),
     });
   }
 
@@ -43,7 +46,7 @@ export async function resetBudgets() {
     .where(
       and(
         eq(schema.budgets.period, currentMonth),
-        eq(schema.budgets.userId, CURRENT_USER_ID),
+        eq(schema.budgets.userId, await getUserId()),
       ),
     );
   revalidatePath("/dashboard", "layout");

@@ -1,5 +1,11 @@
 import { ThemeShowcase } from "@/components/theme-showcase";
 import { Button } from "@/components/ui/button";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "SakuKu - Aplikasi Manajemen Keuangan Pribadi Cerdas",
+  description: "Kelola pengeluaran, buat anggaran, dan pantau kesehatan finansial Anda dengan dashboard modern yang intuitif dan estetis.",
+};
 
 export default function Home() {
   return (
@@ -13,8 +19,8 @@ export default function Home() {
             Atur keuangan pribadi Anda dengan lebih cerdas dan estetis.
           </p>
           <div className="flex gap-4 mt-4">
-            <Button asChild size="lg" className="rounded-full px-8">
-              <a href="/dashboard">Go to Dashboard</a>
+            <Button asChild size="lg" className="rounded-full px-8 bg-primary hover:bg-primary/90 font-bold shadow-lg shadow-primary/20">
+              <a href="/dashboard">Mulai Sekarang</a>
             </Button>
             <Button
               variant="outline"

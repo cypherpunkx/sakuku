@@ -15,7 +15,10 @@ export default function Error({
   const router = useRouter();
 
   useEffect(() => {
-    console.error("Runtime Error:", error);
+    // Silently log error to avoid potential 'subscribe' issues during logging in some environments
+    if (error) {
+      console.log("A technical error occurred.");
+    }
   }, [error]);
 
   return (
