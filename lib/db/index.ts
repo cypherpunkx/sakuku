@@ -1,11 +1,19 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import Database from 'better-sqlite3';
-import * as schema from './schema';
+import { drizzle } from "drizzle-orm/libsql";
+import { createClient } from "@libsql/client";
+import * as schema from "./schema";
 
-const globalForSqlite = global as unknown as { sqlite: Database.Database | undefined };
+const globalForDb = global as unknown as {
+  client: ReturnType<typeof createClient> | undefined;
+};
 
-const sqlite = globalForSqlite.sqlite ?? new Database('sqlite.db');
+export const client =
+  globalForDb.client ??
+  createClient({
+    url: process.env.TURSO_DATABASE_URL!,
+    authToken: process.env.TURSO_AUTH_TOKEN!,
+  });
 
-if (process.env.NODE_ENV !== 'production') globalForSqlite.sqlite = sqlite;
+if (process.env.NODE_ENV !== "production") globalForDb.client = client;
 
-export const db = drizzle(sqlite, { schema });
+export const db = drizzle(client, { schema });
+

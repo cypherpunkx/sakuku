@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import { relations, sql } from "drizzle-orm";
+import { relations } from "drizzle-orm";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -10,9 +10,15 @@ export const users = sqliteTable("users", {
   balance: integer("balance").default(0),
   currency: text("currency").default("IDR"),
   budgetStartDay: integer("budget_start_day").default(1),
-  twoFactorEnabled: integer("two_factor_enabled", { mode: "boolean" }).default(false),
-  emailNotifications: integer("email_notifications", { mode: "boolean" }).default(true),
-  pushNotifications: integer("push_notifications", { mode: "boolean" }).default(true),
+  twoFactorEnabled: integer("two_factor_enabled", { mode: "boolean" }).default(
+    false,
+  ),
+  emailNotifications: integer("email_notifications", {
+    mode: "boolean",
+  }).default(true),
+  pushNotifications: integer("push_notifications", { mode: "boolean" }).default(
+    true,
+  ),
   weeklyReport: integer("weekly_report", { mode: "boolean" }).default(true),
   hasOnboarding: integer("has_onboarding", { mode: "boolean" }).default(false),
   createdAt: text("created_at"),
@@ -24,8 +30,7 @@ export const categories = sqliteTable("categories", {
   type: text("type").$type<"income" | "expense">().notNull(),
   color: text("color"),
   icon: text("icon"),
-  priority: text("priority")
-    .$type<"Kebutuhan" | "Keinginan">(),
+  priority: text("priority").$type<"Kebutuhan" | "Keinginan">(),
 });
 
 export const transactions = sqliteTable("transactions", {
