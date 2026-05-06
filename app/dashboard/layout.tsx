@@ -11,6 +11,7 @@ import { cookies } from "next/headers";
 import { getUser } from "@/lib/actions";
 import { HeaderTitle } from "./_components/header-title";
 import { HeaderIcon } from "./_components/header-icon";
+import { redirect } from "next/navigation";
 
 export default async function DashboardLayout({
   children,
@@ -18,6 +19,11 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const user = await getUser();
+
+  if (!user) {
+    redirect("/api/auth/logout");
+  }
+
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("sidebar_state")?.value === "true";
 
