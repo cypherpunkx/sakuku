@@ -166,3 +166,10 @@ input[type=number] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+@utility no-scrollbar {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

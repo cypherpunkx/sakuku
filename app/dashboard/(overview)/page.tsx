@@ -4,56 +4,12 @@ import { TrendingDown, Receipt, Target, HeartPulse } from "lucide-react";
 import { BudgetInsight503020 } from "../_components/budget-insight";
 import { FinancialSummary } from "../_components/financial-summary";
 
-// Lazy load Tab Contents to reduce initial bundle size
-const ExpenseTabContent = dynamic(
-  () =>
-    import("../_components/tabs/expense-tab-content").then(
-      (mod) => mod.ExpenseTabContent,
-    ),
-  {
-    loading: () => <TableTabSkeleton />,
-  },
-);
-
-const BudgetTabContent = dynamic(
-  () =>
-    import("../_components/tabs/budget-tab-content").then(
-      (mod) => mod.BudgetTabContent,
-    ),
-  {
-    loading: () => <CardGridTabSkeleton />,
-  },
-);
-
-const HealthTabContent = dynamic(
-  () =>
-    import("../_components/tabs/health-tab-content").then(
-      (mod) => mod.HealthTabContent,
-    ),
-  {
-    loading: () => <HealthTabSkeleton />,
-  },
-);
-
-const BillTabContent = dynamic(
-  () =>
-    import("../_components/tabs/bill-tab-content").then(
-      (mod) => mod.BillTabContent,
-    ),
-  {
-    loading: () => <CardGridTabSkeleton />,
-  },
-);
-
-const SavingsTabContent = dynamic(
-  () =>
-    import("../_components/tabs/savings-tab-content").then(
-      (mod) => mod.SavingsTabContent,
-    ),
-  {
-    loading: () => <CardGridTabSkeleton />,
-  },
-);
+// Tab Contents - Regular imports for stability and instant switching
+import { ExpenseTabContent } from "../_components/tabs/expense-tab-content";
+import { BudgetTabContent } from "../_components/tabs/budget-tab-content";
+import { HealthTabContent } from "../_components/tabs/health-tab-content";
+import { BillTabContent } from "../_components/tabs/bill-tab-content";
+import { SavingsTabContent } from "../_components/tabs/savings-tab-content";
 
 // Lazy load AddTransactionModal as it is a large component with many dependencies
 const AddTransactionModal = dynamic(() =>
@@ -154,7 +110,7 @@ async function TabsWrapper({
   return (
     <Tabs value={activeTab} className="w-full min-h-[600px] relative">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sticky top-0 z-40 bg-background/95 backdrop-blur-md py-3 px-1 border-b border-border/10 transform-gpu transition-none">
-        <TabsList className="inline-flex items-center justify-start rounded-2xl bg-muted/20 p-1.5 text-muted-foreground border border-border/40 backdrop-blur-xl w-full lg:w-fit max-lg:overflow-x-auto lg:overflow-visible no-scrollbar gap-1.5 py-5">
+        <TabsList className="inline-flex items-center justify-start rounded-2xl bg-muted/20 p-1.5 text-muted-foreground border border-border/40 backdrop-blur-xl w-full lg:w-fit overflow-x-auto lg:overflow-visible no-scrollbar gap-1.5 py-5">
           <TabsTrigger
             value="pengeluaran"
             asChild
