@@ -3,8 +3,7 @@
 import "server-only";
 import { db } from "../db";
 import * as schema from "../db/schema";
-import { eq, and, desc, sql, or, like, SQL, gte, lte } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { eq, and, desc, sql, SQL, gte, lte } from "drizzle-orm";
 import { verifySession } from "../dal";
 
 export async function getUser() {

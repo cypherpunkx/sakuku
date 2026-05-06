@@ -41,7 +41,8 @@ import { OnboardingModal } from "../_components/onboarding-modal";
 
 export const metadata: Metadata = {
   title: "Ringkasan Dashboard | SakuKu",
-  description: "Pantau kesehatan finansial dan ringkasan anggaran Anda secara real-time.",
+  description:
+    "Pantau kesehatan finansial dan ringkasan anggaran Anda secara real-time.",
 };
 
 // --- Wrapper Components for Streaming ---
@@ -257,6 +258,34 @@ async function TabsWrapper({
   );
 }
 
+async function DashboardContent({
+  range,
+  tab,
+  page,
+  search,
+  category,
+}: {
+  range: string;
+  tab: string;
+  page: string;
+  search: string;
+  category: string;
+}) {
+  return (
+    <div className="flex flex-col gap-8 animate-in fade-in duration-700">
+      <SummaryWrapper range={range} />
+      <InsightWrapper />
+      <TabsWrapper
+        range={range}
+        tab={tab}
+        page={page}
+        search={search}
+        category={category}
+      />
+    </div>
+  );
+}
+
 // Separate AddModal to fetch its own categories
 async function AddModalWrapper() {
   const [{ categories }, user] = await Promise.all([
@@ -323,25 +352,17 @@ export default async function DashboardPage({
         <GreetingWrapper />
       </Suspense>
 
-      <Suspense fallback={<SummarySkeleton />}>
-        <SummaryWrapper range={range} />
+      <Suspense
+        fallback={
+          <div className="flex flex-col gap-8">
+            <SummarySkeleton />
+            <InsightSkeleton />
+            <TabsSkeleton />
+          </div>
+        }
+      >
+        <DashboardContent range={range} tab={tab} page={page} search={search} category={category} />
       </Suspense>
-
-      <Suspense fallback={<InsightSkeleton />}>
-        <InsightWrapper />
-      </Suspense>
-
-      <section className="flex flex-col gap-6">
-        <Suspense fallback={<TabsSkeleton />}>
-          <TabsWrapper
-            range={range}
-            tab={tab}
-            page={page}
-            search={search}
-            category={category}
-          />
-        </Suspense>
-      </section>
 
       <Suspense fallback={null}>
         <AddModalWrapper />
